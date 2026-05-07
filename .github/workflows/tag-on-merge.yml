@@ -1,0 +1,56 @@
+name: Tag on version bump
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  tag:
+    name: Push tag for bumped skill versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Push tag for each skill whose SKILL_VERSION changed
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          for skill_dir in */; do
+            skill="${skill_dir%/}"
+            [[ -f "$skill/SKILL.md" ]] || continue
+
+            curr=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' "$skill/SKILL.md")
+            if [[ -z "$curr" ]]; then
+              echo "::warning::$skill/SKILL.md has no SKILL_VERSION; skipping."
+              continue
+            fi
+
+            # Compare against the previous commit (HEAD~1). On the first commit
+            # to main with this skill present, the previous SKILL.md doesn't
+            # exist, so we treat that as "new skill — tag it".
+            prev=$(git show "HEAD~1:$skill/SKILL.md" 2>/dev/null \
+              | awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' || true)
+
+            if [[ "$prev" == "$curr" ]]; then
+              echo "= $skill: SKILL_VERSION unchanged ($curr); no tag."
+              continue
+            fi
+
+            tag="$skill/v$curr"
+            if git rev-parse "$tag" >/dev/null 2>&1; then
+              echo "= $skill: tag $tag already exists; skipping."
+              continue
+            fi
+
+            echo "+ $skill: tagging $tag (was '$prev', now '$curr')"
+            git tag -a "$tag" -m "$skill v$curr"
+            git push origin "$tag"
+          done

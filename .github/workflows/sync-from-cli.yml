@@ -1,0 +1,82 @@
+name: Sync from CLI
+
+on:
+  schedule:
+    # Daily at 06:00 UTC. The CLI is typically published earlier in the day;
+    # this gives the upstream release time to propagate before the sync runs.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'CLI version to sync (npm spec, e.g. "0.1.180" or "latest")'
+        required: false
+        default: 'latest'
+
+jobs:
+  sync:
+    name: Sync mutagent-cli skill from npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run sync script
+        id: sync
+        run: |
+          set -euo pipefail
+          ./scripts/sync-from-cli.sh "${{ github.event.inputs.version || 'latest' }}"
+
+          # Capture the resolved CLI version from the now-bumped SKILL.md
+          version=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' mutagent-cli/SKILL.md)
+          echo "cli_version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Detect changes
+        id: diff
+        run: |
+          if git diff --quiet -- mutagent-cli/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true"  >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open auto-sync PR
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: sync/cli-v${{ steps.sync.outputs.cli_version }}
+          base: main
+          title: "sync: mutagent-cli skill from CLI v${{ steps.sync.outputs.cli_version }}"
+          body: |
+            Automated sync from `@mutagent/cli@${{ steps.sync.outputs.cli_version }}`.
+
+            **Action items before merge:**
+            - [ ] Review the diff for unexpected behavioral changes
+            - [ ] Update `mutagent-cli/CHANGELOG.md` with a `[${{ steps.sync.outputs.cli_version }}]` entry
+            - [ ] Bump `SKILL_MIN_CLI_VERSION` in `mutagent-cli/SKILL.md` if the
+                  skill now references commands/flags older CLIs don't have
+
+            On merge: `tag-on-merge.yml` pushes `mutagent-cli/v${{ steps.sync.outputs.cli_version }}`,
+            and `release.yml` builds the GitHub Release with tarball.
+          commit-message: "sync: mutagent-cli skill from CLI v${{ steps.sync.outputs.cli_version }}"
+          delete-branch: true
+          labels: |
+            automated
+            sync
+
+      - name: Report no-op
+        if: steps.diff.outputs.changed == 'false'
+        run: |
+          echo "Already in sync with CLI v${{ steps.sync.outputs.cli_version }} — no PR opened."

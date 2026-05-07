@@ -8,3 +8,9 @@ node_modules/
 
 # Local Claude Code working directory — never publish per-machine settings
 .claude/
+
+# Sync script's scratch dir
+.sync-tmp/
+
+# Release tarballs built by the release workflow (only on tag)
+*.tar.gz

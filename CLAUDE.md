@@ -22,8 +22,13 @@ here. Treat every file in this repo as world-readable.
 ├── CLAUDE.md             — this file
 ├── README.md             — public registry index
 ├── LICENSE               — MIT (skills only; the CLI has its own license)
+├── .github/workflows/    — validate, tag-on-merge, release, sync-from-cli
+├── scripts/
+│   ├── sanitize.py       — canonical public/internal filter (idempotent)
+│   └── sync-from-cli.sh  — fetch + reconstitute skill from npm
 └── <skill-name>/
-    ├── SKILL.md          — entry router with frontmatter (name, description, version)
+    ├── SKILL.md          — entry router with frontmatter (name, version, min CLI)
+    ├── CHANGELOG.md      — Keep-a-Changelog format, one entry per release
     ├── concepts/*.md     — WHY/WHAT pre-reads (load before related workflow)
     └── workflows/*.md    — HOW step sequences (CLI command flows)
 ```
@@ -50,16 +55,54 @@ These categories are off-limits in commits, file contents, and PR descriptions:
 If you find any of the above when updating a skill, **strip it before
 committing**. The sanitization checklist below codifies this.
 
+## Versioning rule (READ FIRST)
+
+**CLI-coupled skills lock `SKILL_VERSION` to the `@mutagent/cli` version they
+were synced from.** A skill bundle that documents commands and flags from a
+specific CLI release is meaningless paired with a different CLI release —
+version-locking eliminates that drift.
+
+So for `mutagent-cli`:
+
+- `SKILL_VERSION` = the CLI version this skill was synced from (e.g. `0.1.178`).
+- The sync script (`scripts/sync-from-cli.sh`) bumps it automatically on every
+  sync, even if no skill content changed. A "no-op sync" still produces a new
+  skill release that's verified-against-the-current-CLI.
+- `SKILL_MIN_CLI_VERSION` is the *looser* compat floor (oldest CLI that still
+  works). Bump it only when the skill references commands/flags that older
+  CLIs don't have.
+
+**Independent skills** (not coupled to a CLI binary) may use standalone semver.
+If one is added, document the exception in its own `SKILL.md` and the README.
+
 ## Updating an existing skill
 
-1. Pull the latest skill bundle from upstream into the matching directory here.
-2. Run the sanitization checklist (below) on every modified file.
-3. If user-visible behavior changed, bump `SKILL_VERSION` in `SKILL.md`'s
-   frontmatter (semver: patch for fixes, minor for additive changes, major for
-   breaking router/rule changes).
-4. If the skill now requires a newer CLI, bump `SKILL_MIN_CLI_VERSION` to match.
-5. Update the **Skill Index** table in `README.md` (version + status).
-6. Open a PR. Never push directly to `main`.
+The normal path is **automatic** — `.github/workflows/sync-from-cli.yml` runs
+daily, opens a PR with the synced bundle and the bumped `SKILL_VERSION`. You
+review, update CHANGELOG, merge.
+
+For a manual sync:
+
+```bash
+./scripts/sync-from-cli.sh           # latest @mutagent/cli
+./scripts/sync-from-cli.sh 0.1.180   # a specific version
+```
+
+The script: installs the CLI in a scratch dir, runs `mutagent skills install`,
+rsyncs the result into `mutagent-cli/`, runs `scripts/sanitize.py`, bumps
+`SKILL_VERSION`, prints the diff, and tells you the next git commands.
+
+After the sync (auto or manual), before merge:
+
+1. Review the diff for behavioral changes that warrant a `SKILL_MIN_CLI_VERSION`
+   bump.
+2. Add a new `[<version>]` entry to `<skill>/CHANGELOG.md` describing the
+   changes (CLI release notes are a good source).
+3. Update the **Skill Index** version + tag link in `README.md`.
+4. Open a PR. Never push directly to `main`.
+
+On merge: `tag-on-merge.yml` pushes `<skill>/v<version>` and `release.yml`
+publishes the GitHub Release with tarball.
 
 ## Adding a new skill
 
@@ -71,18 +114,25 @@ committing**. The sanitization checklist below codifies this.
 4. Add a row to the **Skill Index** in `README.md`.
 5. Open a PR with `feat(<skill-name>): initial publish`.
 
-## Sanitization checklist (run before every commit)
+## Sanitization
+
+The canonical filter lives in `scripts/sanitize.py`. It encodes every
+public-vs-internal substitution this registry has ever made. Run it any time
+you touch a skill file:
 
 ```bash
-# From the repo root — should all return zero matches.
-grep -rnE "(mutagent-cli/src|mutagent/src|monorepo|sync-skill)" .
-grep -rnE "\.\./\.\./" .
-grep -rnE "(TODO\(internal\)|FIXME\(internal\)|XXX)" .
+./scripts/sanitize.py            # apply all rules to the whole repo (idempotent)
+./scripts/sanitize.py --check    # verify only, exit non-zero if dirty
+./scripts/sanitize.py mutagent-cli   # scope to a single skill
 ```
 
-In addition, eyeball any blockquote that starts with **"Canonical source"** or
-**"Mirrored in"** — those usually leak internal paths. Rewrite to describe the
-*concept*, not the *file*.
+`scripts/sync-from-cli.sh` runs it automatically after every sync, and
+`.github/workflows/validate.yml` runs `--check` on every PR — a leak cannot
+land on `main`.
+
+If you spot a new internal reference that the script doesn't know about, add a
+rule to `RULES` in `scripts/sanitize.py`. The script will fail loudly if leaks
+remain after rules run, so missing rules don't slip through silently.
 
 ## House rules
 
@@ -93,8 +143,14 @@ In addition, eyeball any blockquote that starts with **"Canonical source"** or
 - **Treat every file as public.** If in doubt about whether something can ship,
   it can't.
 
-## Memory and context
+## Tooling boundary
 
-This repo has no CI, no build step, and no tests — it is pure markdown +
-license. Don't add any of those without an explicit ask. Don't add a
-`package.json`. Don't add a `Makefile`. Keep it boring.
+The only first-class tooling this repo carries is:
+
+- `scripts/sanitize.py` (Python 3 stdlib only)
+- `scripts/sync-from-cli.sh` (bash + npm + node + rsync)
+- `.github/workflows/*.yml` (GitHub Actions)
+
+Don't add a `package.json`, `Makefile`, build step, or test framework. Skills
+are markdown. The scaffolding above is only what's needed to publish them
+safely and predictably.

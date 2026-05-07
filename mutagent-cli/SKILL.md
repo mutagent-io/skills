@@ -8,7 +8,7 @@ description: |
   "create evaluation", "upload dataset", "explore prompts", "mutagent cli",
   "eval", "dataset", "guided", "how do I optimize", "improve my prompt",
   "set up tracing", "add observability".
-SKILL_VERSION: 1.1.0
+SKILL_VERSION: 0.1.178
 SKILL_MIN_CLI_VERSION: 0.1.163
 ---
 

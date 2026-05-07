@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*/v*.*.*'
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse tag → skill + version
+        id: parse
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          skill="${tag%/v*}"
+          version="${tag##*/v}"
+
+          if [[ ! -d "$skill" ]] || [[ ! -f "$skill/SKILL.md" ]]; then
+            echo "::error::Tag $tag does not match any skill directory." >&2
+            exit 1
+          fi
+
+          echo "tag=$tag"         >> "$GITHUB_OUTPUT"
+          echo "skill=$skill"     >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "asset=${skill}-v${version}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Build release tarball
+        run: |
+          tar -czf "${{ steps.parse.outputs.asset }}" "${{ steps.parse.outputs.skill }}/"
+          ls -lh "${{ steps.parse.outputs.asset }}"
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          set -euo pipefail
+          skill="${{ steps.parse.outputs.skill }}"
+          version="${{ steps.parse.outputs.version }}"
+          changelog="$skill/CHANGELOG.md"
+          out=release-notes.md
+
+          if [[ ! -f "$changelog" ]]; then
+            echo "Release of $skill v$version." > "$out"
+          else
+            awk -v ver="$version" '
+              BEGIN { found = 0 }
+              /^## \[/ {
+                if (found) exit
+                if ($0 ~ "\\["ver"\\]") { found = 1; print; next }
+              }
+              found { print }
+            ' "$changelog" > "$out"
+            if [[ ! -s "$out" ]]; then
+              echo "Release of $skill v$version." > "$out"
+            fi
+          fi
+
+          echo "---"
+          cat "$out"
+          echo "---"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "${{ steps.parse.outputs.skill }} v${{ steps.parse.outputs.version }}"
+          tag_name: "${{ steps.parse.outputs.tag }}"
+          body_path: release-notes.md
+          files: ${{ steps.parse.outputs.asset }}
+          draft: false
+          prerelease: false

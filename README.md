@@ -55,10 +55,10 @@ because it's the most expressive, but the conventions (`AskUserQuestion`,
 
 ## Skill Index
 
-| Skill | Status | Description | Min CLI |
-|---|---|---|---|
-| [`mutagent-cli`](./mutagent-cli/) | ✅ Stable · v1.1.0 | Guides agents through prompt upload, dataset curation, evaluation rubric creation, optimization, and framework tracing | `>= 0.1.163` |
-| `agent-builder` | 🚧 Coming soon | Multi-turn agent design, evaluation, and optimization workflows | TBD |
+| Skill | Status | Version | Description | Min CLI |
+|---|---|---|---|---|
+| [`mutagent-cli`](./mutagent-cli/) | ✅ Stable | [v0.1.178](https://github.com/mutagent-io/skills/releases/tag/mutagent-cli/v0.1.178) | Guides agents through prompt upload, dataset curation, evaluation rubric creation, optimization, and framework tracing | `>= 0.1.163` |
+| `agent-builder` | 🚧 Coming soon | — | Multi-turn agent design, evaluation, and optimization workflows | TBD |
 
 > **Status legend:** ✅ Stable · 🟡 Beta · 🚧 Coming soon · ⚠️ Deprecated
 
@@ -96,6 +96,16 @@ git clone https://github.com/mutagent-io/skills .claude/skills/mutagent
 cp -r mutagent-cli /path/to/your/project/.claude/skills/
 ```
 
+### Pinned tarball (per-version, no clone)
+
+Each tagged release ships a tarball as a release asset:
+
+```bash
+SKILL=mutagent-cli; VERSION=0.1.178
+curl -L "https://github.com/mutagent-io/skills/releases/download/${SKILL}/v${VERSION}/${SKILL}-v${VERSION}.tar.gz" \
+  | tar -xz -C .claude/skills/
+```
+
 ### Submodule
 
 ```bash
@@ -130,18 +140,39 @@ See each skill's `SKILL.md` for the full rule set.
 Each skill declares its own version in `SKILL.md` frontmatter:
 
 ```yaml
-SKILL_VERSION: 1.1.0          # semver — bumped per-skill
-SKILL_MIN_CLI_VERSION: 0.1.163 # minimum @mutagent/cli version required
+SKILL_VERSION: 0.1.178         # locked to the @mutagent/cli release this skill ships with
+SKILL_MIN_CLI_VERSION: 0.1.163 # minimum compatible @mutagent/cli version
 ```
 
-- **Patch** (`1.1.0 → 1.1.1`) — wording, examples, doc fixes.
-- **Minor** (`1.1.0 → 1.2.0`) — new workflow file, new concept, additive
-  router rules.
-- **Major** (`1.x → 2.0`) — breaking router changes, removed workflows, or
-  rules that change agent behavior in incompatible ways.
+**CLI-coupled skills (e.g. `mutagent-cli`) lock `SKILL_VERSION` to the
+`@mutagent/cli` version they were synced from.** Every CLI release produces a
+matching skill release, so `mutagent-cli/v0.1.178` always pairs with
+`@mutagent/cli@0.1.178` — no version-skew surprises. The
+`scripts/sync-from-cli.sh` script bumps `SKILL_VERSION` automatically on each
+sync.
 
-If you've installed a skill via `mutagent skills install` and the registry
-ships a newer version, the CLI surfaces an upgrade prompt on next invocation.
+`SKILL_MIN_CLI_VERSION` is the looser compat floor: the skill works with any
+CLI from this version onwards. The CLI surfaces a non-blocking warning when the
+installed CLI is older.
+
+**Independent skills** (future, non-CLI-coupled) may use their own semver. They
+are noted explicitly in `CLAUDE.md`.
+
+### Releases & tags
+
+- Each skill has its own tag namespace: `mutagent-cli/vX.Y.Z`,
+  `agent-builder/vX.Y.Z`.
+- Tags are pushed automatically on merge to `main` when `SKILL_VERSION` changes
+  (see `.github/workflows/tag-on-merge.yml`).
+- A GitHub Release is built for every tag, with the skill's `CHANGELOG.md`
+  excerpt as the release notes and a `<skill>-v<X.Y.Z>.tar.gz` asset
+  (see `.github/workflows/release.yml`).
+
+### Auto-sync
+
+A daily GitHub Action (`.github/workflows/sync-from-cli.yml`) pulls the latest
+`@mutagent/cli` from npm, runs the sync script, and opens a PR if anything
+changed. You can also dispatch it manually with a specific CLI version.
 
 ---
 
