@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   tag:
     name: Push tag for bumped skill versions

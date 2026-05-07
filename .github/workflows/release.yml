@@ -5,6 +5,9 @@ on:
     tags:
       - '*/v*.*.*'
 
+permissions:
+  contents: read
+
 jobs:
   release:
     name: Publish GitHub Release
@@ -14,6 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Parse tag → skill + version
         id: parse
@@ -34,23 +39,28 @@ jobs:
           echo "asset=${skill}-v${version}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Build release tarball
+        env:
+          ASSET: ${{ steps.parse.outputs.asset }}
+          SKILL: ${{ steps.parse.outputs.skill }}
         run: |
-          tar -czf "${{ steps.parse.outputs.asset }}" "${{ steps.parse.outputs.skill }}/"
-          ls -lh "${{ steps.parse.outputs.asset }}"
+          set -euo pipefail
+          tar -czf "$ASSET" "$SKILL/"
+          ls -lh "$ASSET"
 
       - name: Extract release notes from CHANGELOG
         id: notes
+        env:
+          SKILL: ${{ steps.parse.outputs.skill }}
+          VERSION: ${{ steps.parse.outputs.version }}
         run: |
           set -euo pipefail
-          skill="${{ steps.parse.outputs.skill }}"
-          version="${{ steps.parse.outputs.version }}"
-          changelog="$skill/CHANGELOG.md"
+          changelog="$SKILL/CHANGELOG.md"
           out=release-notes.md
 
           if [[ ! -f "$changelog" ]]; then
-            echo "Release of $skill v$version." > "$out"
+            echo "Release of $SKILL v$VERSION." > "$out"
           else
-            awk -v ver="$version" '
+            awk -v ver="$VERSION" '
               BEGIN { found = 0 }
               /^## \[/ {
                 if (found) exit
@@ -59,7 +69,7 @@ jobs:
               found { print }
             ' "$changelog" > "$out"
             if [[ ! -s "$out" ]]; then
-              echo "Release of $skill v$version." > "$out"
+              echo "Release of $SKILL v$VERSION." > "$out"
             fi
           fi
 
@@ -68,7 +78,10 @@ jobs:
           echo "---"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        # Pinned to softprops/action-gh-release v3.0.0 commit SHA.
+        # Bump tag in the comment when bumping the SHA — the tag is informational,
+        # the SHA is what GitHub Actions actually fetches.
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
         with:
           name: "${{ steps.parse.outputs.skill }} v${{ steps.parse.outputs.version }}"
           tag_name: "${{ steps.parse.outputs.tag }}"

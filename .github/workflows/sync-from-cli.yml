@@ -12,6 +12,9 @@ on:
         required: false
         default: 'latest'
 
+permissions:
+  contents: read
+
 jobs:
   sync:
     name: Sync mutagent-cli skill from npm
@@ -35,9 +38,22 @@ jobs:
 
       - name: Run sync script
         id: sync
+        env:
+          # Validated as a pure semver/dist-tag string before use; never
+          # interpolated directly into a shell string.
+          INPUT_VERSION: ${{ github.event.inputs.version || 'latest' }}
         run: |
           set -euo pipefail
-          ./scripts/sync-from-cli.sh "${{ github.event.inputs.version || 'latest' }}"
+
+          # Defense-in-depth: even though workflow_dispatch is maintainer-only,
+          # constrain the version input to npm-safe characters before passing
+          # it to the script.
+          if [[ ! "$INPUT_VERSION" =~ ^(latest|[0-9a-zA-Z._+-]+)$ ]]; then
+            echo "::error::Invalid version input: '$INPUT_VERSION'"
+            exit 1
+          fi
+
+          ./scripts/sync-from-cli.sh "$INPUT_VERSION"
 
           # Capture the resolved CLI version from the now-bumped SKILL.md
           version=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' mutagent-cli/SKILL.md)
@@ -54,7 +70,8 @@ jobs:
 
       - name: Open auto-sync PR
         if: steps.diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v6
+        # Pinned to peter-evans/create-pull-request v8.1.1 commit SHA.
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1  # v8.1.1
         with:
           branch: sync/cli-v${{ steps.sync.outputs.cli_version }}
           base: main
@@ -78,5 +95,7 @@ jobs:
 
       - name: Report no-op
         if: steps.diff.outputs.changed == 'false'
+        env:
+          CLI_VERSION: ${{ steps.sync.outputs.cli_version }}
         run: |
-          echo "Already in sync with CLI v${{ steps.sync.outputs.cli_version }} — no PR opened."
+          echo "Already in sync with CLI v$CLI_VERSION — no PR opened."
