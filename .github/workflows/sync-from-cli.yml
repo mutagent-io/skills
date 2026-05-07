@@ -23,6 +23,11 @@ jobs:
       contents: write
       pull-requests: write
 
+    # Outputs consumed by the audit-leaks job (gated, off by default).
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      cli_version: ${{ steps.sync.outputs.cli_version }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -99,3 +104,74 @@ jobs:
           CLI_VERSION: ${{ steps.sync.outputs.cli_version }}
         run: |
           echo "Already in sync with CLI v$CLI_VERSION — no PR opened."
+
+  # ============================================================================
+  # Optional second-pass leak audit using Claude Code.
+  # ============================================================================
+  #
+  # Disabled by default. To enable:
+  #   1. Add repo secret  `ANTHROPIC_API_KEY`     (Settings → Secrets → Actions)
+  #   2. Add repo variable `ENABLE_CLAUDE_AUDIT` set to "true"
+  #                                              (Settings → Variables → Actions)
+  #
+  # When enabled, this job runs on every auto-sync PR that has a non-empty
+  # diff. It instructs Claude to read scripts/sanitize.py, then review the
+  # changed mutagent-cli/ files for any internal references the regex-based
+  # sanitizer would miss (semantic leaks: "Mirrored in...", "Canonical
+  # source: ...", references to internal RFCs, etc.). Claude posts a PR
+  # review comment with offending lines + a proposed RULES tuple to add to
+  # scripts/sanitize.py. The maintainer applies the rule and re-runs sync.
+  #
+  # The deterministic regex sanitizer (validate.yml's --check) remains the
+  # floor. Claude is the long-tail catcher.
+  audit-leaks:
+    name: Claude leak audit (opt-in)
+    needs: sync
+    if: ${{ needs.sync.outputs.changed == 'true' && vars.ENABLE_CLAUDE_AUDIT == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sync/cli-v${{ needs.sync.outputs.cli_version }}
+          persist-credentials: false
+
+      # Pinned to anthropics/claude-code-action v1.0.115 commit SHA.
+      - uses: anthropics/claude-code-action@9db782c3a17ef2bfc274cd17411bc3e0a5ba1345  # v1.0.115
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing an automated sync PR for the **public** MutagenT
+            skills registry. The diff brings markdown content from a private
+            monorepo via `npm install @mutagent/cli`. The script
+            `scripts/sanitize.py` already strips known internal references via
+            regex rules.
+
+            Your job: catch internal references the regex misses.
+
+            Steps:
+            1. Read `scripts/sanitize.py` to understand which patterns are
+               already handled (RULES list and LEAK_PATTERNS).
+            2. Read every changed file under `mutagent-cli/`.
+            3. Flag anything internal that the regex would not catch:
+               - Source/test file paths the rules don't cover
+               - Mentions of internal repos, decision records, RFCs, ADRs
+               - Phrases like "Mirrored in...", "Canonical source: ...",
+                 "Internal team contact: ...", "see #channel-name"
+               - Anything that wouldn't make sense to a public reader
+
+            4. If you find a leak: post a PR review comment with the
+               offending lines AND a proposed Python tuple to add to the
+               RULES list in `scripts/sanitize.py`. Format the tuple as:
+                   ("<relative_path>", "<find_string>", "<replace_string>")
+               Use multi-line strings in the tuple as needed.
+
+            5. If clean: post a single PR comment
+                   "✓ Claude audit clean — no internal references detected
+                    beyond what scripts/sanitize.py already handles."
+
+            Do NOT modify files yourself. The maintainer applies the rule
+            manually so the rule lands as a reviewable, testable change.
