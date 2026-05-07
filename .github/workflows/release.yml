@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*/v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Parse tag → skill + version
+        id: parse
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          skill="${tag%/v*}"
+          version="${tag##*/v}"
+
+          if [[ ! -d "$skill" ]] || [[ ! -f "$skill/SKILL.md" ]]; then
+            echo "::error::Tag $tag does not match any skill directory." >&2
+            exit 1
+          fi
+
+          echo "tag=$tag"         >> "$GITHUB_OUTPUT"
+          echo "skill=$skill"     >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "asset=${skill}-v${version}.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Build release tarball
+        env:
+          ASSET: ${{ steps.parse.outputs.asset }}
+          SKILL: ${{ steps.parse.outputs.skill }}
+        run: |
+          set -euo pipefail
+          tar -czf "$ASSET" "$SKILL/"
+          ls -lh "$ASSET"
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        env:
+          SKILL: ${{ steps.parse.outputs.skill }}
+          VERSION: ${{ steps.parse.outputs.version }}
+        run: |
+          set -euo pipefail
+          changelog="$SKILL/CHANGELOG.md"
+          out=release-notes.md
+
+          if [[ ! -f "$changelog" ]]; then
+            echo "Release of $SKILL v$VERSION." > "$out"
+          else
+            awk -v ver="$VERSION" '
+              BEGIN { found = 0 }
+              /^## \[/ {
+                if (found) exit
+                if ($0 ~ "\\["ver"\\]") { found = 1; print; next }
+              }
+              found { print }
+            ' "$changelog" > "$out"
+            if [[ ! -s "$out" ]]; then
+              echo "Release of $SKILL v$VERSION." > "$out"
+            fi
+          fi
+
+          echo "---"
+          cat "$out"
+          echo "---"
+
+      - name: Create GitHub Release
+        # Pinned to softprops/action-gh-release v3.0.0 commit SHA.
+        # Bump tag in the comment when bumping the SHA — the tag is informational,
+        # the SHA is what GitHub Actions actually fetches.
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
+        with:
+          name: "${{ steps.parse.outputs.skill }} v${{ steps.parse.outputs.version }}"
+          tag_name: "${{ steps.parse.outputs.tag }}"
+          body_path: release-notes.md
+          files: ${{ steps.parse.outputs.asset }}
+          draft: false
+          prerelease: false
