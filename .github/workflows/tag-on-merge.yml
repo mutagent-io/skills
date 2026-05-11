@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   tag:
-    name: Push tag for bumped skill versions
+    name: Push tag for bumped plugin versions
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,41 +19,47 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Push tag for each skill whose SKILL_VERSION changed
+      - name: Push tag for each plugin whose version changed
         run: |
           set -euo pipefail
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          for skill_dir in */; do
-            skill="${skill_dir%/}"
-            [[ -f "$skill/SKILL.md" ]] || continue
+          mp=".claude-plugin/marketplace.json"
+          if [[ ! -f "$mp" ]]; then
+            echo "::warning::$mp not found; nothing to tag."
+            exit 0
+          fi
 
-            curr=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' "$skill/SKILL.md")
-            if [[ -z "$curr" ]]; then
-              echo "::warning::$skill/SKILL.md has no SKILL_VERSION; skipping."
+          # Iterate every plugin entry in the current marketplace.json and
+          # compare its version against the same entry in HEAD~1's copy. Push
+          # a tag if the version changed (or if the entry is new).
+          while IFS=$'\t' read -r name curr_version; do
+            [[ -n "$name" && -n "$curr_version" ]] || continue
+
+            prev_version=$(git show "HEAD~1:$mp" 2>/dev/null \
+              | python3 -c "import json, sys; data=json.load(sys.stdin); print(next((p.get('version','') for p in data.get('plugins',[]) if p.get('name')=='$name'), ''))" \
+              2>/dev/null || true)
+
+            if [[ "$prev_version" == "$curr_version" ]]; then
+              echo "= $name: version unchanged ($curr_version); no tag."
               continue
             fi
 
-            # Compare against the previous commit (HEAD~1). On the first commit
-            # to main with this skill present, the previous SKILL.md doesn't
-            # exist, so we treat that as "new skill — tag it".
-            prev=$(git show "HEAD~1:$skill/SKILL.md" 2>/dev/null \
-              | awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' || true)
-
-            if [[ "$prev" == "$curr" ]]; then
-              echo "= $skill: SKILL_VERSION unchanged ($curr); no tag."
-              continue
-            fi
-
-            tag="$skill/v$curr"
+            tag="$name/v$curr_version"
             if git rev-parse "$tag" >/dev/null 2>&1; then
-              echo "= $skill: tag $tag already exists; skipping."
+              echo "= $name: tag $tag already exists; skipping."
               continue
             fi
 
-            echo "+ $skill: tagging $tag (was '$prev', now '$curr')"
-            git tag -a "$tag" -m "$skill v$curr"
+            echo "+ $name: tagging $tag (was '$prev_version', now '$curr_version')"
+            git tag -a "$tag" -m "$name v$curr_version"
             git push origin "$tag"
-          done
+          done < <(python3 -c "
+          import json
+          with open('.claude-plugin/marketplace.json') as f:
+              data = json.load(f)
+          for p in data.get('plugins', []):
+              print(f\"{p.get('name','')}\t{p.get('version','')}\")
+          ")

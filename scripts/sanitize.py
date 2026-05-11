@@ -7,11 +7,13 @@ does not filter internal-only references. This script applies the canonical
 public-vs-internal split for every skill in this registry.
 
 Idempotent: running twice produces the same output. Exits non-zero if any leak
-pattern is still present after sanitization.
+pattern is still present after sanitization. Path-agnostic: every rule is a
+(find, replace) pair applied across every skill markdown file in scope, so
+restructuring the repo layout doesn't break rules.
 
 Usage:
     ./scripts/sanitize.py                  # run on the whole repo (default)
-    ./scripts/sanitize.py mutagent-cli     # run on a single skill dir
+    ./scripts/sanitize.py skills/<name>    # run on a single skill dir
     ./scripts/sanitize.py --check          # verify only, no edits
 """
 
@@ -35,12 +37,16 @@ LEAK_PATTERNS = [
 ]
 LEAK_RE = re.compile("|".join(LEAK_PATTERNS))
 
-# Each rule = (relative_path, find_text, replace_text).
-# Strings are exact matches (no regex). Idempotent: if `find` is absent, no-op.
-RULES: list[tuple[str, str, str]] = [
-    # --- mutagent-cli/SKILL.md ---
+# Directories to skip during skill-file discovery.
+SKIP_DIR_NAMES = {".sync-tmp", ".git", "node_modules"}
+
+# Each rule = (find_text, replace_text). Strings are exact matches (no regex).
+# Idempotent: if `find` is absent, no-op. Rules are applied to every skill
+# markdown file — the multi-line `find` strings are specific enough that they
+# will only match where intended.
+RULES: list[tuple[str, str]] = [
+    # --- SKILL.md (canonical-source blockquote referencing internal layout) ---
     (
-        "mutagent-cli/SKILL.md",
         "> **Canonical source**: `mutagent-cli/.claude/skills/mutagent-cli/SKILL.md`\n"
         "> Packed into the CLI binary via `scripts/sync-skill.ts`. Installed to end-user\n"
         "> dev environments via `mutagent skills install`. Edit this file, not the installed copy.",
@@ -48,22 +54,21 @@ RULES: list[tuple[str, str, str]] = [
         "> CLI binary so it stays version-aligned. This published copy is the canonical\n"
         "> reference — edit upstream and re-publish, never the installed copy.",
     ),
+    # --- SKILL.md (dangling decision-record link to monorepo docs/) ---
     (
-        "mutagent-cli/SKILL.md",
         "`mutagent login` is canonical. `mutagent auth login` is a back-compat alias. "
         "Both delegate to `lib/auth-flow.ts`. Decision record: "
         "[cli-design-principles.md](../../docs/cli-design-principles.md) -> Login Unification.",
         "`mutagent login` is canonical. `mutagent auth login` is a back-compat alias.",
     ),
-    # --- mutagent-cli/concepts/eval-criteria.md ---
+    # --- concepts/eval-criteria.md (BE-mirror reference in frontmatter description) ---
     (
-        "mutagent-cli/concepts/eval-criteria.md",
         "  Includes current platform validation rules for criterion shape.\n"
         "  Mirrored in mutagent/src/modules/prompts/prompt-evaluations/README.md.",
         "  Includes current platform validation rules for criterion shape.",
     ),
+    # --- concepts/eval-criteria.md (4-line canonical-source blockquote) ---
     (
-        "mutagent-cli/concepts/eval-criteria.md",
         "> **Canonical source** for the INPUT vs OUTPUT framing. Mirrored in:\n"
         "> - `mutagent-cli/src/commands/prompts/evaluation/guided-workflow.ts` — kept in sync.\n"
         "> - `mutagent/src/modules/prompts/prompt-evaluations/README.md` as BE-side\n"
@@ -71,21 +76,20 @@ RULES: list[tuple[str, str, str]] = [
         "> **Canonical source** for the INPUT vs OUTPUT framing used by the MutagenT\n"
         "> evaluation engine.",
     ),
+    # --- concepts/eval-criteria.md (BE-mirror cross-reference line) ---
     (
-        "mutagent-cli/concepts/eval-criteria.md",
         "- [concepts/prompt-variables.md](./prompt-variables.md) → delimiter inference (used in MVC step)\n"
         "- `mutagent/src/modules/prompts/prompt-evaluations/README.md` → BE mirror",
         "- [concepts/prompt-variables.md](./prompt-variables.md) → delimiter inference (used in MVC step)",
     ),
-    # --- mutagent-cli/concepts/dataset-design.md ---
+    # --- concepts/dataset-design.md (frontmatter description line) ---
     (
-        "mutagent-cli/concepts/dataset-design.md",
         "  Parallel structure to concepts/eval-criteria.md for cognitive parity.\n"
         "  Mirrored in the CLI directive's bootstrappable instruction field.",
         "  Parallel structure to concepts/eval-criteria.md for cognitive parity.",
     ),
+    # --- concepts/dataset-design.md (canonical-source blockquote w/ internal path) ---
     (
-        "mutagent-cli/concepts/dataset-design.md",
         "> **Parallel to** [concepts/eval-criteria.md](./eval-criteria.md) -- same section\n"
         "> structure so agents can navigate both consistently.\n"
         ">\n"
@@ -97,17 +101,15 @@ RULES: list[tuple[str, str, str]] = [
         ">\n"
         "> **Canonical source** for dataset curation principles.",
     ),
-    # --- mutagent-cli/concepts/prompt-variables.md ---
+    # --- concepts/prompt-variables.md (Source + Tests cross-references) ---
     (
-        "mutagent-cli/concepts/prompt-variables.md",
         "- [concepts/eval-criteria.md](./eval-criteria.md) → MVC (Minimum Viable Context) — uses delimiter to enumerate input params\n"
         "- Source: `mutagent-cli/src/lib/explorer.ts` → `inferPromptVariables()` and `DiscoveredPrompt.delimiter`\n"
         "- Tests: `mutagent-cli/src/__tests__/lib/explorer.test.ts`",
         "- [concepts/eval-criteria.md](./eval-criteria.md) → MVC (Minimum Viable Context) — uses delimiter to enumerate input params",
     ),
-    # --- mutagent-cli/concepts/scorecard-output.md ---
+    # --- concepts/scorecard-output.md (Reproduced from <internal path>) ---
     (
-        "mutagent-cli/concepts/scorecard-output.md",
         "Reproduced from\n`mutagent/src/framework/metatuner/output/scorecard.ts`:",
         "The optimizer emits this shape on each iteration (TypeScript):",
     ),
@@ -115,45 +117,45 @@ RULES: list[tuple[str, str, str]] = [
 
 
 def discover_skill_files(scope: Path) -> list[Path]:
-    """Return every *.md under skill directories (anything containing SKILL.md)."""
-    files: list[Path] = []
+    """Return every markdown file under any skill (directory containing a
+    SKILL.md). Excludes CHANGELOG.md and known scratch/build dirs."""
     if scope.is_file() and scope.suffix == ".md":
         return [scope]
-    candidates = [scope] if (scope / "SKILL.md").is_file() else [
-        d for d in scope.iterdir() if d.is_dir() and (d / "SKILL.md").is_file()
-    ]
-    for skill_dir in candidates:
+
+    skill_dirs: set[Path] = set()
+    for skill_md in scope.rglob("SKILL.md"):
+        if any(part in SKIP_DIR_NAMES for part in skill_md.parts):
+            continue
+        skill_dirs.add(skill_md.parent)
+
+    files: list[Path] = []
+    for skill_dir in skill_dirs:
         for md in skill_dir.rglob("*.md"):
             if md.name == "CHANGELOG.md":
+                continue
+            if any(part in SKIP_DIR_NAMES for part in md.parts):
                 continue
             files.append(md)
     return files
 
 
-def apply_rules(scope: Path, *, check_only: bool) -> tuple[int, list[Path]]:
-    """Apply substitution rules. Returns (changes_made, modified_files)."""
-    changes = 0
+def apply_rules(files: list[Path], *, check_only: bool) -> tuple[int, list[Path]]:
+    """Apply every (find, replace) rule to every discovered skill file.
+    Returns (rule_applications, files_modified)."""
+    applications = 0
     modified: list[Path] = []
-    for rel_path, find, replace in RULES:
-        target = REPO_ROOT / rel_path
-        try:
-            target.relative_to(scope.resolve())
-        except ValueError:
-            # Rule's target is outside the requested scope — skip it.
-            continue
-        if not target.is_file():
-            continue
-        original = target.read_text(encoding="utf-8")
-        if find not in original:
-            continue
-        new = original.replace(find, replace)
-        if new == original:
-            continue
-        changes += 1
-        modified.append(target)
-        if not check_only:
-            target.write_text(new, encoding="utf-8")
-    return changes, modified
+    for path in files:
+        original = path.read_text(encoding="utf-8")
+        new = original
+        for find, replace in RULES:
+            if find in new:
+                new = new.replace(find, replace)
+                applications += 1
+        if new != original:
+            modified.append(path)
+            if not check_only:
+                path.write_text(new, encoding="utf-8")
+    return applications, modified
 
 
 def scan_leaks(files: list[Path]) -> list[tuple[Path, int, str]]:
@@ -186,23 +188,26 @@ def main() -> int:
         print(f"ERROR: scope does not exist: {scope}", file=sys.stderr)
         return 2
 
-    changes, modified = apply_rules(scope, check_only=args.check)
-    if args.check and changes:
+    files = discover_skill_files(scope)
+    applications, modified = apply_rules(files, check_only=args.check)
+
+    if args.check and applications:
         print(
-            f"ERROR: {changes} sanitization rule(s) would be applied (run without --check):",
+            f"ERROR: {applications} sanitization rule application(s) would run "
+            f"(re-run without --check):",
             file=sys.stderr,
         )
         for path in modified:
             print(f"  - {path.relative_to(REPO_ROOT)}", file=sys.stderr)
         return 1
-    if changes:
-        print(f"Applied {changes} sanitization rule(s):")
+
+    if applications:
+        print(f"Applied {applications} sanitization rule application(s) across {len(modified)} file(s):")
         for path in modified:
             print(f"  - {path.relative_to(REPO_ROOT)}")
     else:
         print("No sanitization rules applied (already clean or no matching content).")
 
-    files = discover_skill_files(scope)
     leaks = scan_leaks(files)
     if leaks:
         print(
@@ -213,7 +218,7 @@ def main() -> int:
             print(f"  {path.relative_to(REPO_ROOT)}:{lineno}: {line}", file=sys.stderr)
         print(
             "\nThis means a new internal reference appeared upstream that the "
-            "sanitizer doesn't know about. Add a rule to scripts/sanitize.py.",
+            "sanitizer doesn't know about. Add a rule to RULES in scripts/sanitize.py.",
             file=sys.stderr,
         )
         return 1

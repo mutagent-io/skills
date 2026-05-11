@@ -60,14 +60,22 @@ jobs:
 
           ./scripts/sync-from-cli.sh "$INPUT_VERSION"
 
-          # Capture the resolved CLI version from the now-bumped SKILL.md
-          version=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' mutagent-cli/SKILL.md)
+          # Capture the resolved CLI version from the now-bumped marketplace
+          # plugin entry. The sync script is responsible for keeping this in
+          # sync with the npm package it pulled.
+          version=$(python3 -c "
+          import json
+          with open('.claude-plugin/marketplace.json') as f:
+              data = json.load(f)
+          entry = next(p for p in data['plugins'] if p['name'] == 'mutagent')
+          print(entry['version'])
+          ")
           echo "cli_version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Detect changes
         id: diff
         run: |
-          if git diff --quiet -- mutagent-cli/; then
+          if git diff --quiet -- skills/mutagent-cli/ .claude-plugin/marketplace.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true"  >> "$GITHUB_OUTPUT"
@@ -85,10 +93,9 @@ jobs:
             Automated sync from `@mutagent/cli@${{ steps.sync.outputs.cli_version }}`.
 
             **Action items before merge:**
-            - [ ] Review the diff for unexpected behavioral changes
-            - [ ] Update `mutagent-cli/CHANGELOG.md` with a `[${{ steps.sync.outputs.cli_version }}]` entry
-            - [ ] Bump `SKILL_MIN_CLI_VERSION` in `mutagent-cli/SKILL.md` if the
-                  skill now references commands/flags older CLIs don't have
+            - [ ] Review the diff for unexpected behavioral changes:
+                  `git diff -- skills/mutagent-cli/ .claude-plugin/marketplace.json`
+            - [ ] Update `skills/mutagent-cli/CHANGELOG.md` with a `[${{ steps.sync.outputs.cli_version }}]` entry
 
             On merge: `tag-on-merge.yml` pushes `mutagent-cli/v${{ steps.sync.outputs.cli_version }}`,
             and `release.yml` builds the GitHub Release with tarball.

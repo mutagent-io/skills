@@ -6,10 +6,16 @@
 #   1. Install @mutagent/cli@<version> into a throwaway temp dir
 #   2. Run `mutagent skills install` inside a scratch git repo to materialize
 #      the embedded skill markdown to disk
-#   3. rsync the result into ./mutagent-cli/, preserving CHANGELOG.md
+#   3. rsync the result into ./skills/mutagent-cli/, preserving CHANGELOG.md
 #   4. Run scripts/sanitize.py to strip internal references
-#   5. Bump SKILL_VERSION in SKILL.md to match the synced CLI version
+#   5. Bump the mutagent-cli plugin entry's `version` in .claude-plugin/marketplace.json
+#      to match the synced CLI version
 #   6. Print a diff summary and suggested next steps
+#
+# Trust note: SKILL.md frontmatter (including any version field upstream sets) is
+# kept byte-identical to whatever the CLI ships. The proper place to normalize
+# frontmatter shape is `sync-skill.ts` in the upstream CLI repo. Here we own only
+# the marketplace.json plugin version.
 #
 # Usage:
 #   ./scripts/sync-from-cli.sh                 # syncs from @mutagent/cli@latest
@@ -21,10 +27,15 @@ set -euo pipefail
 
 VERSION="${1:-latest}"
 SKILL_NAME="mutagent-cli"
+# Marketplace plugin entry whose version we bump in lockstep with the CLI.
+# This is the single bundled plugin that ships every skill in the repo.
+PLUGIN_NAME="mutagent"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$REPO_ROOT/.sync-tmp"
-TARGET_DIR="$REPO_ROOT/$SKILL_NAME"
+TARGET_DIR="$REPO_ROOT/skills/$SKILL_NAME"
+MARKETPLACE_FILE="$REPO_ROOT/.claude-plugin/marketplace.json"
+PLUGIN_FILE="$REPO_ROOT/.claude-plugin/plugin.json"
 
 cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
@@ -76,54 +87,72 @@ rsync -a --delete \
 echo "==> Sanitizing"
 "$REPO_ROOT/scripts/sanitize.py" "$TARGET_DIR"
 
-echo "==> Bumping SKILL_VERSION to $CLI_VERSION"
-SKILL_FILE="$TARGET_DIR/SKILL.md"
-if [[ ! -f "$SKILL_FILE" ]]; then
-  echo "ERROR: $SKILL_FILE missing after sync" >&2
+echo "==> Bumping $PLUGIN_NAME plugin version to $CLI_VERSION (marketplace.json + plugin.json)"
+if [[ ! -f "$MARKETPLACE_FILE" ]]; then
+  echo "ERROR: $MARKETPLACE_FILE missing — cannot bump plugin version." >&2
   exit 1
 fi
-# Replace the SKILL_VERSION line in YAML frontmatter. POSIX sed differs between
-# macOS and GNU; use python for portability.
-python3 - "$SKILL_FILE" "$CLI_VERSION" <<'PY'
-import sys, re, pathlib
-path = pathlib.Path(sys.argv[1])
-version = sys.argv[2]
-text = path.read_text(encoding="utf-8")
-new, n = re.subn(
-    r"^SKILL_VERSION: .*$",
-    f"SKILL_VERSION: {version}",
-    text,
-    count=1,
-    flags=re.MULTILINE,
-)
-if n == 0:
-    print(f"ERROR: no SKILL_VERSION line found in {path}", file=sys.stderr)
+if [[ ! -f "$PLUGIN_FILE" ]]; then
+  echo "ERROR: $PLUGIN_FILE missing — cannot bump plugin version." >&2
+  exit 1
+fi
+python3 - "$MARKETPLACE_FILE" "$PLUGIN_FILE" "$PLUGIN_NAME" "$CLI_VERSION" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+mp_path = Path(sys.argv[1])
+plugin_path = Path(sys.argv[2])
+target_plugin = sys.argv[3]
+new_version = sys.argv[4]
+
+# marketplace.json: bump the entry whose name == target_plugin
+mp = json.loads(mp_path.read_text(encoding="utf-8"))
+plugins = mp.get("plugins", [])
+for entry in plugins:
+    if entry.get("name") == target_plugin:
+        entry["version"] = new_version
+        break
+else:
+    print(
+        f"ERROR: plugin entry '{target_plugin}' not found in marketplace.json",
+        file=sys.stderr,
+    )
     sys.exit(1)
-path.write_text(new, encoding="utf-8")
+mp_path.write_text(json.dumps(mp, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+# plugin.json: bump the manifest version too — Claude Code can read either; we
+# keep them in lockstep to avoid the documented "plugin.json silently wins"
+# footgun.
+manifest = json.loads(plugin_path.read_text(encoding="utf-8"))
+manifest["version"] = new_version
+plugin_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 PY
 
 echo
 echo "==> Diff summary"
 cd "$REPO_ROOT"
-if git diff --quiet -- "$SKILL_NAME/"; then
+if git diff --quiet -- "skills/$SKILL_NAME/" "$MARKETPLACE_FILE" "$PLUGIN_FILE"; then
   echo "    (no changes — repo already up-to-date with CLI v$CLI_VERSION)"
   exit 0
 fi
-git diff --stat -- "$SKILL_NAME/"
+git diff --stat -- "skills/$SKILL_NAME/" "$MARKETPLACE_FILE" "$PLUGIN_FILE"
 
 echo
 cat <<EOF
-==> Done. CLI v$CLI_VERSION synced into $SKILL_NAME/.
+==> Done. CLI v$CLI_VERSION synced into skills/$SKILL_NAME/.
+
+Plugin version bumped to $CLI_VERSION in:
+  - .claude-plugin/marketplace.json (plugins[].name == "$PLUGIN_NAME")
+  - .claude-plugin/plugin.json (manifest version)
 
 Next steps (manual):
   1. Review the diff:
-       git diff -- $SKILL_NAME/
-  2. Update $SKILL_NAME/CHANGELOG.md with a [$CLI_VERSION] entry summarizing changes.
-  3. If MIN_CLI_VERSION needs to move forward (e.g. new CLI commands referenced),
-     bump SKILL_MIN_CLI_VERSION in $SKILL_NAME/SKILL.md.
-  4. Commit and open a PR:
+       git diff -- skills/$SKILL_NAME/ .claude-plugin/
+  2. Update skills/$SKILL_NAME/CHANGELOG.md with a [$CLI_VERSION] entry summarizing changes.
+  3. Commit and open a PR:
        git checkout -b sync/cli-v$CLI_VERSION
-       git add $SKILL_NAME/
+       git add skills/$SKILL_NAME/ .claude-plugin/
        git commit -m "sync: $SKILL_NAME from CLI v$CLI_VERSION"
        git push -u origin sync/cli-v$CLI_VERSION
        gh pr create --base main --title "sync: $SKILL_NAME from CLI v$CLI_VERSION"

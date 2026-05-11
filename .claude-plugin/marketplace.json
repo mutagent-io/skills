@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "mutagent-io",
+  "description": "Official MutagenT skills for AI coding agents — MutagenT is the platform for optimizing prompts and agents.",
+  "owner": {
+    "name": "Mutagent",
+    "email": "bcyb@mutagent.io"
+  },
+  "plugins": [
+    {
+      "name": "mutagent",
+      "source": "./",
+      "description": "Official MutagenT skills bundle — guides Claude Code through prompt optimization, evaluation, dataset curation, framework tracing, and (soon) agent design.",
+      "version": "0.1.178",
+      "category": "ai-tools",
+      "tags": ["mutagent", "prompt-optimization", "evaluation", "tracing", "observability"],
+      "homepage": "https://github.com/mutagent-io/skills",
+      "repository": "https://github.com/mutagent-io/skills",
+      "license": "MIT"
+    }
+  ]
+}
