@@ -8,37 +8,61 @@ repository**. If you are looking for *how to use* the skills, read
 
 ## What this repo is
 
-The **public skills registry for the MutagenT platform**. It hosts user-facing
-skill bundles that ship to AI coding agents — installable via
-`mutagent skills install`, by direct clone, or as a git submodule.
+The **public skills marketplace for the MutagenT platform**. It hosts
+user-facing skill bundles that ship to AI coding agents — installable via
+Claude Code's `/plugin marketplace add`, via `mutagent skills install`, by
+direct clone, or as a git submodule.
 
-It is **not** the source of truth. Skills are authored privately and published
-here. Treat every file in this repo as world-readable.
+It satisfies two compatible specs from one source of truth:
+
+- [Agent Skills spec](https://agentskills.io/specification) — every skill at
+  `skills/<name>/SKILL.md` is a valid bare skill.
+- [Claude Code marketplace spec](https://code.claude.com/docs/en/plugin-marketplaces)
+  — `.claude-plugin/marketplace.json` at the repo root wraps the skills as
+  installable plugins.
+
+It is **not** the source of truth for skill content. Skills are authored
+privately (`@mutagent/cli` carries the canonical `mutagent-cli` skill in its
+own source tree) and published here. Treat every file in this repo as
+world-readable.
 
 ## What lives here
 
 ```
 .
-├── CLAUDE.md             — this file
-├── README.md             — public registry index
-├── LICENSE               — MIT (skills only; the CLI has its own license)
-├── .github/workflows/    — validate, tag-on-merge, release, sync-from-cli
-├── scripts/
-│   ├── sanitize.py       — canonical public/internal filter (idempotent)
-│   └── sync-from-cli.sh  — fetch + reconstitute skill from npm
-└── <skill-name>/
-    ├── SKILL.md          — entry router with frontmatter (name, version, min CLI)
-    ├── CHANGELOG.md      — Keep-a-Changelog format, one entry per release
-    ├── concepts/*.md     — WHY/WHAT pre-reads (load before related workflow)
-    └── workflows/*.md    — HOW step sequences (CLI command flows)
+├── .claude-plugin/
+│   ├── marketplace.json     — marketplace catalog (Claude Code reads this)
+│   └── plugin.json          — plugin manifest (the repo itself IS the plugin)
+├── skills/
+│   └── <skill-name>/
+│       ├── SKILL.md         — entry router; YAML frontmatter + Markdown body
+│       ├── CHANGELOG.md     — Keep-a-Changelog format, one entry per release
+│       ├── concepts/*.md    — WHY/WHAT pre-reads (load before related workflow)
+│       └── workflows/*.md   — HOW step sequences (CLI command flows)
+├── CLAUDE.md                — this file
+├── README.md                — public registry index, install paths
+├── LICENSE                  — MIT (skills only; the CLI has its own license)
+├── .github/workflows/       — validate, tag-on-merge, release, sync-from-cli
+└── scripts/
+    ├── sanitize.py          — canonical public/internal filter (idempotent)
+    └── sync-from-cli.sh     — fetch + reconstitute skill from npm
 ```
+
+**Layout shape.** The marketplace catalogs ONE bundled plugin
+(`mutagent`) whose source is the repo root (`./`). Every skill lives
+flat under `./skills/<name>/`, never nested inside a per-skill plugin
+directory. This is forced by Claude Code's plugin spec: plugin source must
+contain `skills/<name>/SKILL.md`, with no way to express "the source dir IS
+the skill". One bundled plugin avoids the nesting redundancy.
 
 Currently shipping:
 
-- `mutagent-cli/` — guides agents through the MutagenT CLI (explore → upload →
-  dataset → eval → optimize → trace).
+- `skills/mutagent-cli/` — guides agents through the MutagenT CLI (explore →
+  upload → dataset → eval → optimize → trace).
 
-Planned: `agent-builder/` (multi-turn agent design + optimization).
+Planned: `skills/agent-builder/` (multi-turn agent design + optimization).
+Adding it is just: drop a `skills/agent-builder/` dir with a SKILL.md; bump
+the plugin version; ship.
 
 ## What does NOT live here
 
@@ -53,32 +77,42 @@ These categories are off-limits in commits, file contents, and PR descriptions:
 - Customer data, API keys, workspace IDs, or trace payloads.
 
 If you find any of the above when updating a skill, **strip it before
-committing**. The sanitization checklist below codifies this.
+committing**. `scripts/sanitize.py --check` is the gate; CI fails on leaks.
 
 ## Versioning rule (READ FIRST)
 
-**CLI-coupled skills lock `SKILL_VERSION` to the `@mutagent/cli` version they
-were synced from.** A skill bundle that documents commands and flags from a
-specific CLI release is meaningless paired with a different CLI release —
-version-locking eliminates that drift.
+**There is one plugin version.** It lives in two files kept in lockstep by
+the sync script:
 
-So for `mutagent-cli`:
+- `.claude-plugin/plugin.json` → `version`
+- `.claude-plugin/marketplace.json` → `plugins[name="mutagent"].version`
 
-- `SKILL_VERSION` = the CLI version this skill was synced from (e.g. `0.1.178`).
-- The sync script (`scripts/sync-from-cli.sh`) bumps it automatically on every
-  sync, even if no skill content changed. A "no-op sync" still produces a new
-  skill release that's verified-against-the-current-CLI.
-- `SKILL_MIN_CLI_VERSION` is the *looser* compat floor (oldest CLI that still
-  works). Bump it only when the skill references commands/flags that older
-  CLIs don't have.
+Tags follow `mutagent/v<X.Y.Z>` and are pushed automatically by
+`.github/workflows/tag-on-merge.yml` when the version field in
+`marketplace.json` changes on `main`.
 
-**Independent skills** (not coupled to a CLI binary) may use standalone semver.
-If one is added, document the exception in its own `SKILL.md` and the README.
+For CLI-coupled syncs (`mutagent-cli` skill from `@mutagent/cli`), the plugin
+version is bumped in lockstep with the synced CLI release. The sync script
+(`scripts/sync-from-cli.sh`) handles the bump automatically — even on no-op
+syncs, the plugin version moves to whatever the CLI is at, so each release is
+a verified-against-the-current-CLI artifact.
+
+Each individual skill's `SKILL.md` frontmatter currently carries
+`SKILL_VERSION` and `SKILL_MIN_CLI_VERSION` as top-level keys, mirrored from
+the upstream CLI's `.claude/skills/` source. These are **informational** and
+may not strictly conform to the Agent Skills spec (which expects custom keys
+under `metadata:`). The proper fix is upstream in the CLI's `sync-skill.ts`.
+Do not hand-rewrite the frontmatter here — every sync would clobber it.
+
+**Future skills** (e.g. `agent-builder`) join the same plugin bundle. Their
+content updates bump the same plugin version. If a skill ever wants
+independent install/update granularity, that's a future decision to split the
+marketplace into multiple plugin entries.
 
 ## Updating an existing skill
 
 The normal path is **automatic** — `.github/workflows/sync-from-cli.yml` runs
-daily, opens a PR with the synced bundle and the bumped `SKILL_VERSION`. You
+daily, opens a PR with the synced bundle and the bumped plugin version. You
 review, update CHANGELOG, merge.
 
 For a manual sync:
@@ -89,41 +123,55 @@ For a manual sync:
 ```
 
 The script: installs the CLI in a scratch dir, runs `mutagent skills install`,
-rsyncs the result into `mutagent-cli/`, runs `scripts/sanitize.py`, bumps
-`SKILL_VERSION`, prints the diff, and tells you the next git commands.
+rsyncs the result into `skills/mutagent-cli/`, runs `scripts/sanitize.py`,
+bumps the plugin version in both `marketplace.json` and `plugin.json`, prints
+the diff, and tells you the next git commands.
 
 After the sync (auto or manual), before merge:
 
-1. Review the diff for behavioral changes that warrant a `SKILL_MIN_CLI_VERSION`
-   bump.
-2. Add a new `[<version>]` entry to `<skill>/CHANGELOG.md` describing the
-   changes (CLI release notes are a good source).
-3. Update the **Skill Index** version + tag link in `README.md`.
-4. Open a PR. Never push directly to `main`.
+1. Review the diff for behavioral changes.
+2. Add a new `[<version>]` entry to `skills/mutagent-cli/CHANGELOG.md`
+   describing the changes (CLI release notes are a good source).
+3. Open a PR. Never push directly to `main`.
 
-On merge: `tag-on-merge.yml` pushes `<skill>/v<version>` and `release.yml`
-publishes the GitHub Release with tarball.
+On merge: `tag-on-merge.yml` pushes `mutagent/v<version>` and
+`release.yml` publishes the GitHub Release with tarball.
 
 ## Adding a new skill
 
-1. Create a top-level directory `<skill-name>/`.
-2. Add `SKILL.md` with frontmatter: `name`, `description`, `SKILL_VERSION`,
-   `SKILL_MIN_CLI_VERSION` (if CLI-dependent).
-3. Add `concepts/` and `workflows/` subfolders only if they carry weight —
-   small skills can live in a single `SKILL.md`.
-4. Add a row to the **Skill Index** in `README.md`.
-5. Open a PR with `feat(<skill-name>): initial publish`.
+The single-plugin layout makes this lightweight — drop a directory under
+`skills/`, no marketplace.json plugin-entry edits needed.
+
+1. Create `skills/<new-name>/SKILL.md` with valid frontmatter per the
+   [Agent Skills spec](https://agentskills.io/specification):
+   - `name` — must match the folder name exactly. Lowercase a-z + digits +
+     hyphens only. 1-64 chars. No leading/trailing hyphen, no `--`.
+   - `description` — what the skill does AND when to use it (triggers, file
+     types, scenarios). 1-1024 chars. Vague descriptions get rejected by
+     downstream registries.
+2. Bump the plugin version in `.claude-plugin/plugin.json` and the
+   `mutagent` entry in `.claude-plugin/marketplace.json`. Use semver:
+   minor bump for the new skill (additive), patch for content updates only.
+3. Add `skills/<new-name>/CHANGELOG.md` with the initial release entry.
+4. Validate locally:
+   ```bash
+   skills-ref validate ./skills/<new-name>
+   claude plugin validate .
+   ./scripts/sanitize.py --check
+   ```
+5. Open a PR with `feat(<new-name>): initial publish`.
 
 ## Sanitization
 
 The canonical filter lives in `scripts/sanitize.py`. It encodes every
-public-vs-internal substitution this registry has ever made. Run it any time
-you touch a skill file:
+public-vs-internal substitution this registry has ever made and is
+path-agnostic (rules are applied across every discovered SKILL.md and its
+siblings, with no hardcoded file paths).
 
 ```bash
 ./scripts/sanitize.py            # apply all rules to the whole repo (idempotent)
 ./scripts/sanitize.py --check    # verify only, exit non-zero if dirty
-./scripts/sanitize.py mutagent-cli   # scope to a single skill
+./scripts/sanitize.py skills/<name>   # scope to a single skill
 ```
 
 `scripts/sync-from-cli.sh` runs it automatically after every sync, and
@@ -131,8 +179,9 @@ you touch a skill file:
 land on `main`.
 
 If you spot a new internal reference that the script doesn't know about, add a
-rule to `RULES` in `scripts/sanitize.py`. The script will fail loudly if leaks
-remain after rules run, so missing rules don't slip through silently.
+`(find, replace)` 2-tuple to the `RULES` list in `scripts/sanitize.py`. The
+script will fail loudly if leaks remain after rules run, so missing rules
+don't slip through silently.
 
 ## House rules
 
@@ -140,8 +189,24 @@ remain after rules run, so missing rules don't slip through silently.
 - **Never commit anything copied verbatim from `mutagent-monorepo/`** without
   passing the sanitization checklist.
 - **Never add a relative link** that points outside this repo.
-- **Treat every file as public.** If in doubt about whether something can ship,
-  it can't.
+- **Never rewrite SKILL.md frontmatter** here — it's auto-synced from the CLI;
+  the proper fix is upstream.
+- **Treat every file as public.** If in doubt about whether something can
+  ship, it can't.
+
+## Validation stack
+
+Three checks run on every PR:
+
+1. **`./scripts/sanitize.py --check`** — internal-leak guard (this repo's
+   responsibility).
+2. **[`skills-ref`](https://github.com/agentskills/agentskills)
+   `validate ./skills/<name>`** — Agent Skills spec compliance (frontmatter
+   shape, name format, description length, file layout).
+3. **`claude plugin validate .`** — Claude Code marketplace wrapper compliance
+   (manifest schema, source path resolution, plugin structure).
+
+All three must pass. They cover non-overlapping layers and don't conflict.
 
 ## Tooling boundary
 
@@ -149,8 +214,9 @@ The only first-class tooling this repo carries is:
 
 - `scripts/sanitize.py` (Python 3 stdlib only)
 - `scripts/sync-from-cli.sh` (bash + npm + node + rsync)
-- `.github/workflows/*.yml` (GitHub Actions)
+- `.github/workflows/*.yml` (GitHub Actions; CI also installs `skills-ref` and
+  `@anthropic-ai/claude-code` for the validation jobs)
 
-Don't add a `package.json`, `Makefile`, build step, or test framework. Skills
-are markdown. The scaffolding above is only what's needed to publish them
-safely and predictably.
+Don't add a `package.json`, `Makefile`, build step, or test framework in the
+repo root. Skills are markdown. The scaffolding above is only what's needed
+to publish them safely and predictably.

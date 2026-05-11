@@ -27,72 +27,59 @@ jobs:
       - name: Verify no internal references leaked
         run: ./scripts/sanitize.py --check
 
-  version-format:
-    name: SKILL_VERSION format check
+  agent-skills-spec:
+    name: Agent Skills spec (skills-ref)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Validate every SKILL_VERSION matches semver
+      - name: Set up Go (skills-ref toolchain)
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Install skills-ref
+        # The skills-ref reference validator lives under agentskills/agentskills.
+        # If installation via `go install` ever changes, update the URL here.
+        run: |
+          set -euo pipefail
+          if ! go install github.com/agentskills/agentskills/skills-ref/cmd/skills-ref@latest; then
+            echo "::error::Failed to install skills-ref from agentskills/agentskills." \
+                 "Update the install path or fall back to a vendored validator." >&2
+            exit 1
+          fi
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Validate every skill against the Agent Skills spec
         run: |
           set -euo pipefail
           fail=0
-          for skill_dir in */; do
-            skill="${skill_dir%/}"
-            [[ -f "$skill/SKILL.md" ]] || continue
-            ver=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' "$skill/SKILL.md")
-            if [[ ! "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
-              echo "::error file=$skill/SKILL.md::Invalid SKILL_VERSION '$ver' — must match semver (e.g. '0.1.178' or '1.0.0-rc.1')."
+          for skill_md in $(find skills -mindepth 2 -maxdepth 2 -name SKILL.md); do
+            skill_dir=$(dirname "$skill_md")
+            echo "→ skills-ref validate $skill_dir"
+            if ! skills-ref validate "$skill_dir"; then
               fail=1
-            else
-              echo "✓ $skill: SKILL_VERSION=$ver"
             fi
           done
           exit $fail
 
-  version-bump:
-    name: SKILL_VERSION bump check
+  marketplace-spec:
+    name: Claude Code marketplace spec
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           persist-credentials: false
 
-      - name: Require SKILL_VERSION bump for changed skills
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          set -euo pipefail
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-          fail=0
-          for skill_dir in */; do
-            skill="${skill_dir%/}"
-            [[ -f "$skill/SKILL.md" ]] || continue
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
 
-            # Files changed in this PR under this skill, excluding CHANGELOG.md
-            changed=$(git diff --name-only "origin/$BASE_REF...HEAD" -- "$skill/" \
-              | grep -v "^$skill/CHANGELOG.md$" || true)
-            [[ -n "$changed" ]] || continue
-
-            # If SKILL.md is new on this PR, this is a new skill — exempt.
-            if ! git cat-file -e "origin/$BASE_REF:$skill/SKILL.md" 2>/dev/null; then
-              echo "✓ $skill: new skill (no version-bump check needed)"
-              continue
-            fi
-
-            prev=$(git show "origin/$BASE_REF:$skill/SKILL.md" \
-              | awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }')
-            curr=$(awk -F': *' '/^SKILL_VERSION:/ { print $2; exit }' "$skill/SKILL.md")
-
-            if [[ "$prev" == "$curr" ]]; then
-              echo "::error file=$skill/SKILL.md::Files in $skill/ changed but SKILL_VERSION is still $curr — bump it before merging."
-              fail=1
-            else
-              echo "✓ $skill: SKILL_VERSION $prev → $curr"
-            fi
-          done
-          exit $fail
+      - name: Validate marketplace + plugin wrapper
+        run: claude plugin validate .

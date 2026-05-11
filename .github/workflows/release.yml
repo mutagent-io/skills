@@ -20,60 +20,85 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Parse tag → skill + version
+      - name: Parse tag → plugin + version
         id: parse
         run: |
           set -euo pipefail
           tag="${GITHUB_REF#refs/tags/}"
-          skill="${tag%/v*}"
+          plugin="${tag%/v*}"
           version="${tag##*/v}"
 
-          if [[ ! -d "$skill" ]] || [[ ! -f "$skill/SKILL.md" ]]; then
-            echo "::error::Tag $tag does not match any skill directory." >&2
+          # Confirm the tag refers to a plugin currently listed in marketplace.json.
+          if ! python3 -c "
+          import json, sys
+          data = json.load(open('.claude-plugin/marketplace.json'))
+          names = [p['name'] for p in data.get('plugins', [])]
+          sys.exit(0 if '$plugin' in names else 1)
+          "; then
+            echo "::error::Tag $tag references unknown plugin '$plugin' (not in marketplace.json)." >&2
             exit 1
           fi
 
           echo "tag=$tag"         >> "$GITHUB_OUTPUT"
-          echo "skill=$skill"     >> "$GITHUB_OUTPUT"
+          echo "plugin=$plugin"   >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "asset=${skill}-v${version}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "asset=${plugin}-v${version}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Build release tarball
         env:
           ASSET: ${{ steps.parse.outputs.asset }}
-          SKILL: ${{ steps.parse.outputs.skill }}
         run: |
           set -euo pipefail
-          tar -czf "$ASSET" "$SKILL/"
+          # The single-plugin layout (source: "./") makes the whole repo the
+          # plugin source. For the release asset we ship only the
+          # installable surface: plugin/marketplace manifests + skill content.
+          tar -czf "$ASSET" \
+            .claude-plugin/marketplace.json \
+            .claude-plugin/plugin.json \
+            skills/ \
+            LICENSE \
+            README.md
           ls -lh "$ASSET"
 
-      - name: Extract release notes from CHANGELOG
-        id: notes
+      - name: Extract release notes from skill CHANGELOGs
         env:
-          SKILL: ${{ steps.parse.outputs.skill }}
+          PLUGIN: ${{ steps.parse.outputs.plugin }}
           VERSION: ${{ steps.parse.outputs.version }}
         run: |
           set -euo pipefail
-          changelog="$SKILL/CHANGELOG.md"
           out=release-notes.md
+          echo "# $PLUGIN v$VERSION" > "$out"
+          echo "" >> "$out"
 
-          if [[ ! -f "$changelog" ]]; then
-            echo "Release of $SKILL v$VERSION." > "$out"
-          else
-            awk -v ver="$VERSION" '
-              BEGIN { found = 0 }
+          # Append the matching version section from every skill's CHANGELOG.md
+          # under skills/<name>/. If none of them carries an entry for this
+          # version, fall back to a generic line.
+          found=0
+          for changelog in skills/*/CHANGELOG.md; do
+            [[ -f "$changelog" ]] || continue
+            section=$(awk -v ver="$VERSION" '
+              BEGIN { in_section = 0 }
               /^## \[/ {
-                if (found) exit
-                if ($0 ~ "\\["ver"\\]") { found = 1; print; next }
+                if (in_section) exit
+                if ($0 ~ "\\["ver"\\]") { in_section = 1; print; next }
               }
-              found { print }
-            ' "$changelog" > "$out"
-            if [[ ! -s "$out" ]]; then
-              echo "Release of $SKILL v$VERSION." > "$out"
+              in_section { print }
+            ' "$changelog")
+            if [[ -n "$section" ]]; then
+              skill_name=$(basename "$(dirname "$changelog")")
+              echo "## skills/$skill_name" >> "$out"
+              echo "" >> "$out"
+              echo "$section" >> "$out"
+              echo "" >> "$out"
+              found=1
             fi
+          done
+
+          if [[ $found -eq 0 ]]; then
+            echo "Release of $PLUGIN v$VERSION." >> "$out"
           fi
 
-          echo "---"
+          echo "--- release notes ---"
           cat "$out"
           echo "---"
 
@@ -83,7 +108,7 @@ jobs:
         # the SHA is what GitHub Actions actually fetches.
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda  # v3.0.0
         with:
-          name: "${{ steps.parse.outputs.skill }} v${{ steps.parse.outputs.version }}"
+          name: "${{ steps.parse.outputs.plugin }} v${{ steps.parse.outputs.version }}"
           tag_name: "${{ steps.parse.outputs.tag }}"
           body_path: release-notes.md
           files: ${{ steps.parse.outputs.asset }}

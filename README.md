@@ -18,47 +18,43 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@mutagent/cli"><img src="https://img.shields.io/npm/v/@mutagent/cli?style=for-the-badge&color=cb3837&logo=npm&logoColor=white&label=CLI" alt="CLI on npm"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge" alt="License: MIT"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Registry-Skills-7c3aed?style=for-the-badge" alt="Skills Registry"></a>
-  <a href="https://docs.claude.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-Compatible-f97316?style=for-the-badge" alt="Claude Code Compatible"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Marketplace-mutagent-7c3aed?style=for-the-badge" alt="Marketplace: mutagent"></a>
+  <a href="https://docs.claude.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-Plugin-f97316?style=for-the-badge" alt="Claude Code Plugin"></a>
+  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-Spec-2563eb?style=for-the-badge" alt="Agent Skills spec"></a>
 </p>
 
 <p align="center">
-  <strong>Skill plugins for AI coding agents working with the MutagenT platform.</strong>
+  <strong>Official MutagenT skills for AI coding agents — MutagenT is the platform for optimizing prompts and agents.</strong>
 </p>
 
 ---
 
 ## What is this?
 
-This is the **public registry of MutagenT skills** — markdown-only bundles that
-teach AI coding agents (Claude Code, Cursor, Aider, Continue, and any other
-runtime that supports the Anthropic skill format) how to drive the MutagenT
-platform end-to-end: from prompt discovery to optimization to framework
-tracing.
+The **public marketplace of MutagenT skills** for AI coding agents (Claude Code,
+Cursor, Aider, Continue — anything that consumes the [Agent Skills
+spec](https://agentskills.io/specification)). Each skill teaches the agent how
+to drive one part of the MutagenT platform: prompt optimization, evaluation,
+dataset curation, observability, and agent design.
 
-A skill is a directory containing:
+The repository serves **two compatible formats from a single source of truth**:
 
-- `SKILL.md` — the entry router. Frontmatter declares the skill's name,
-  description, version, and any minimum CLI version. The body routes the agent
-  to the right workflow based on user intent.
-- `concepts/*.md` — *why/what* references. Loaded on-demand to give the agent
-  the conceptual frame for a task (eval rubric design, dataset principles,
-  variable delimiters, scorecard interpretation).
-- `workflows/*.md` — *how* step sequences. CLI command flows for concrete
-  goals (optimize a prompt, curate a dataset, add tracing).
-
-Skills are runtime-agnostic by design. They use Claude Code's skill format
-because it's the most expressive, but the conventions (`AskUserQuestion`,
-`--json`, directive cards) translate cleanly to any agent runtime.
+- **Claude Code plugin marketplace** — `/plugin marketplace add` installs the
+  whole catalog; `/plugin install <plugin>@mutagent-io` installs one plugin.
+- **Bare [Agent Skills](https://agentskills.io)** — every skill lives at
+  `skills/<name>/SKILL.md` and is consumable by any registry, crawler, or
+  runtime that reads the open spec.
 
 ---
 
 ## Skill Index
 
-| Skill | Status | Version | Description | Min CLI |
-|---|---|---|---|---|
-| [`mutagent-cli`](./mutagent-cli/) | ✅ Stable | [v0.1.178](https://github.com/mutagent-io/skills/releases/tag/mutagent-cli/v0.1.178) | Guides agents through prompt upload, dataset curation, evaluation rubric creation, optimization, and framework tracing | `>= 0.1.163` |
-| `agent-builder` | 🚧 Coming soon | — | Multi-turn agent design, evaluation, and optimization workflows | TBD |
+The marketplace ships one bundled plugin (`mutagent`) that contains every skill. Releases are tagged at the plugin level: [`mutagent/v0.1.178`](https://github.com/mutagent-io/skills/releases/tag/mutagent/v0.1.178).
+
+| Skill | Status | Path | Description |
+|---|---|---|---|
+| [`mutagent-cli`](./skills/mutagent-cli/) | ✅ Stable | `skills/mutagent-cli/` | Prompt upload, dataset curation, evaluation rubric creation, optimization, and framework tracing via [`@mutagent/cli`](https://www.npmjs.com/package/@mutagent/cli). |
+| `agent-builder` | 🚧 Coming soon | `skills/agent-builder/` | Multi-turn agent design, evaluation, and optimization workflows. |
 
 > **Status legend:** ✅ Stable · 🟡 Beta · 🚧 Coming soon · ⚠️ Deprecated
 
@@ -66,7 +62,21 @@ because it's the most expressive, but the conventions (`AskUserQuestion`,
 
 ## Install
 
-### Recommended — via the MutagenT CLI
+### Recommended — via Claude Code marketplace
+
+```bash
+# Inside Claude Code
+/plugin marketplace add mutagent-io/skills
+/plugin install mutagent@mutagent-io
+```
+
+That's it. Claude Code reads `.claude-plugin/marketplace.json` from this repo
+and caches the bundled `mutagent` plugin under
+`~/.claude/plugins/cache/`. Every skill inside (`mutagent-cli`, etc.) is
+auto-invoked when the agent detects matching trigger phrases (e.g. *"optimize
+this prompt"*, *"add tracing"*). Skill namespace: `/mutagent:mutagent-cli`.
+
+### Alternative — via the MutagenT CLI
 
 ```bash
 # Install the CLI (one of)
@@ -78,101 +88,142 @@ npm install -g @mutagent/cli
 # Authenticate
 mutagent login --browser
 
-# Install all bundled skills into your project's .claude/skills/
+# Install the bundled skill into your project's .claude/skills/
 mutagent skills install
 ```
 
-`mutagent skills install` drops the appropriate `.claude/skills/<skill>/`
-directory into your project so Claude Code (and any runtime that reads
-`.claude/skills/`) picks it up automatically.
-
-### Manual — clone or copy
-
-```bash
-# Clone into your project
-git clone https://github.com/mutagent-io/skills .claude/skills/mutagent
-
-# Or copy a single skill
-cp -r mutagent-cli /path/to/your/project/.claude/skills/
-```
+`mutagent skills install` writes `.claude/skills/mutagent-cli/` into your
+project root. Useful if you already use the MutagenT CLI and don't want to
+involve Claude Code's plugin manager.
 
 ### Pinned tarball (per-version, no clone)
 
-Each tagged release ships a tarball as a release asset:
+Each tagged release ships a tarball as a release asset (contains
+`.claude-plugin/`, `skills/`, `LICENSE`, `README.md`):
 
 ```bash
-SKILL=mutagent-cli; VERSION=0.1.178
-curl -L "https://github.com/mutagent-io/skills/releases/download/${SKILL}/v${VERSION}/${SKILL}-v${VERSION}.tar.gz" \
-  | tar -xz -C .claude/skills/
+VERSION=0.1.178
+curl -L "https://github.com/mutagent-io/skills/releases/download/mutagent/v${VERSION}/mutagent-v${VERSION}.tar.gz" \
+  | tar -xz -C ./my-skills-snapshot
 ```
 
-### Submodule
+### Clone or submodule
 
 ```bash
+# Clone the whole repo
+git clone https://github.com/mutagent-io/skills
+
+# Or as a submodule
 git submodule add https://github.com/mutagent-io/skills .claude/skills/mutagent
+
+# Then copy a specific skill where Claude Code will pick it up
+cp -r skills/mutagent-cli /path/to/your/project/.claude/skills/
 ```
+
+---
+
+## Layout
+
+```
+.
+├── .claude-plugin/
+│   └── marketplace.json          # Catalog read by /plugin marketplace add
+├── skills/
+│   └── mutagent-cli/
+│       ├── SKILL.md              # Entry router (frontmatter + body)
+│       ├── CHANGELOG.md
+│       ├── concepts/             # WHY/WHAT pre-reads
+│       └── workflows/            # HOW step sequences
+└── ...
+```
+
+Every skill is a directory under `skills/` containing at minimum a `SKILL.md`.
+The directory name and the `name:` field in the SKILL frontmatter must match
+(both kebab-case). All paths in `marketplace.json` are relative — never
+escapes the repo root.
 
 ---
 
 ## How an agent uses a skill
 
-When a user's request matches a skill's trigger phrases (e.g. *"optimize this
-prompt"*, *"add tracing"*), the agent loads `SKILL.md` and follows its journey
-router to the matching workflow. Concept files are loaded only when the
-workflow asks for them — keeping the agent's context window lean.
+Skills are **model-invoked**, not slash-commanded: Claude reads each skill's
+`description` frontmatter at startup and auto-loads the matching one when a
+user's request lines up with its triggers. The body of `SKILL.md` then routes
+the agent to a specific `workflows/` file; `concepts/` pages are loaded only
+when a workflow asks for them.
 
-The skills in this registry follow a few non-negotiable conventions:
+Non-negotiable conventions every skill in this marketplace follows:
 
-- **`--json` on every CLI call.** Agents parse structured output, not chatter.
-- **Explore before modify.** Read-only discovery (`mutagent explore --json`)
-  always precedes any write.
-- **Cost transparency.** `mutagent usage --json` is shown to the user before
-  any optimization spend.
-- **Never auto-generate eval rubrics.** Rubrics are collected from the user
-  field-by-field, never invented from context.
+- **`--json` on every CLI call** — agents parse structured output.
+- **Explore before modify** — read-only discovery precedes any write.
+- **Cost transparency** — usage shown to the user before any LLM spend.
+- **Never auto-generate eval rubrics** — collected from the user, never
+  invented.
 
 See each skill's `SKILL.md` for the full rule set.
 
 ---
 
+## How to add a new skill
+
+The marketplace ships one bundled plugin (`mutagent`). Adding a skill
+means dropping a new directory under `./skills/` — no marketplace.json edits
+needed unless you want different metadata.
+
+1. Create `skills/<new-name>/SKILL.md` with valid frontmatter — the `name`
+   field must match the folder name exactly (kebab-case, no leading/trailing
+   hyphen, no consecutive `--`, ≤ 64 chars). The `description` must explain
+   **what** the skill does AND **when** to use it (triggers, file types,
+   scenarios), ≤ 1024 chars. See [`agentskills.io/specification`][spec] for
+   the full frontmatter rules.
+2. Bump the plugin version in both `.claude-plugin/plugin.json` and the
+   `mutagent` entry in `.claude-plugin/marketplace.json` (semver:
+   minor for new skills, patch for content updates).
+3. Add a `skills/<new-name>/CHANGELOG.md` with the initial release entry.
+4. Validate locally:
+   ```bash
+   skills-ref validate ./skills/<new-name>   # Agent Skills spec
+   claude plugin validate .                  # marketplace + plugin wrapper
+   ./scripts/sanitize.py --check             # internal-leak guard
+   ```
+5. Open a PR. CI runs the same three validators on every PR.
+
+[spec]: https://agentskills.io/specification
+
+---
+
 ## Versioning
 
-Each skill declares its own version in `SKILL.md` frontmatter:
+The bundled `mutagent` plugin has a single version (in both
+`.claude-plugin/plugin.json` and the `mutagent` entry in
+`.claude-plugin/marketplace.json`, kept in lockstep by the sync script).
+Tags follow `mutagent/v<X.Y.Z>` and are pushed automatically when the
+version field changes on `main` (see `.github/workflows/tag-on-merge.yml`).
 
-```yaml
-SKILL_VERSION: 0.1.178         # locked to the @mutagent/cli release this skill ships with
-SKILL_MIN_CLI_VERSION: 0.1.163 # minimum compatible @mutagent/cli version
-```
+For CLI-coupled releases, the plugin version is bumped in lockstep with the
+synced `@mutagent/cli` release — `mutagent/v0.1.178` was synced from
+`@mutagent/cli@0.1.178`. When non-CLI-coupled skills (e.g. `agent-builder`)
+land later, the plugin version moves on whichever event triggered it (any
+content change in any skill).
 
-**CLI-coupled skills (e.g. `mutagent-cli`) lock `SKILL_VERSION` to the
-`@mutagent/cli` version they were synced from.** Every CLI release produces a
-matching skill release, so `mutagent-cli/v0.1.178` always pairs with
-`@mutagent/cli@0.1.178` — no version-skew surprises. The
-`scripts/sync-from-cli.sh` script bumps `SKILL_VERSION` automatically on each
-sync.
+A daily GitHub Action (`.github/workflows/sync-from-cli.yml`) checks npm for
+new `@mutagent/cli` releases, runs the sync script, and opens a PR if
+anything changed.
 
-`SKILL_MIN_CLI_VERSION` is the looser compat floor: the skill works with any
-CLI from this version onwards. The CLI surfaces a non-blocking warning when the
-installed CLI is older.
+---
 
-**Independent skills** (future, non-CLI-coupled) may use their own semver. They
-are noted explicitly in `CLAUDE.md`.
+## Validation
 
-### Releases & tags
+Two complementary validators run on every PR:
 
-- Each skill has its own tag namespace: `mutagent-cli/vX.Y.Z`,
-  `agent-builder/vX.Y.Z`.
-- Tags are pushed automatically on merge to `main` when `SKILL_VERSION` changes
-  (see `.github/workflows/tag-on-merge.yml`).
-- A GitHub Release is built for every tag, with the skill's `CHANGELOG.md`
-  excerpt as the release notes and a `<skill>-v<X.Y.Z>.tar.gz` asset
-  (see `.github/workflows/release.yml`).
+- **[`skills-ref`](https://github.com/agentskills/agentskills)** — validates
+  each skill against the open Agent Skills spec (frontmatter shape, name
+  format, description length, file layout).
+- **`claude plugin validate`** — validates the marketplace + plugin wrapper
+  (manifest schema, source path resolution, no-`..` rule).
 
-### Auto-sync
-
-A daily GitHub Action (`.github/workflows/sync-from-cli.yml`) pulls the latest
-`@mutagent/cli` from npm, runs the sync script, and opens a PR if anything
-changed. You can also dispatch it manually with a specific CLI version.
+Both must pass. Plus our own `scripts/sanitize.py --check` catches any
+internal-monorepo references that slip in via the auto-sync.
 
 ---
 
@@ -182,23 +233,21 @@ Issues and PRs are welcome — especially:
 
 - **Wording fixes** in skill prose where an agent went off-script.
 - **New trigger phrases** for the journey router (real user wording you've
-  seen).
+  seen in production).
 - **New concept files** for cross-cutting MutagenT topics that workflows can
   pre-load.
-
-For new top-level skills (e.g. integrations with other agent runtimes), open
-an issue first to align on scope before sending a PR.
+- **New skills** following the procedure above.
 
 All contributors must keep the [house rules in `CLAUDE.md`](./CLAUDE.md) — no
 internal paths, no relative links escaping the repo, no commits that haven't
-passed the sanitization checklist.
+passed the validators.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](./LICENSE). The skills in this registry are independent
-of the [MutagenT CLI license](https://www.npmjs.com/package/@mutagent/cli);
+MIT — see [LICENSE](./LICENSE). The skills in this marketplace are licensed
+independently of the [MutagenT CLI](https://www.npmjs.com/package/@mutagent/cli);
 you can fork, adapt, and republish them under MIT terms.
 
 ---

@@ -1,0 +1,10 @@
+{
+  "name": "mutagent",
+  "description": "Official MutagenT skills bundle for AI coding agents — guides Claude Code through prompt upload, dataset curation, evaluation rubric creation, optimization, framework tracing, and (planned) multi-turn agent design.",
+  "version": "0.1.178",
+  "author": { "name": "Mutagent" },
+  "homepage": "https://github.com/mutagent-io/skills",
+  "repository": "https://github.com/mutagent-io/skills",
+  "license": "MIT",
+  "keywords": ["mutagent", "prompt-optimization", "evaluation", "tracing", "observability"]
+}
