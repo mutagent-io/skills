@@ -131,12 +131,18 @@ version is bumped in lockstep with the synced CLI release. The sync script
 syncs, the plugin version moves to whatever the CLI is at, so each release is
 a verified-against-the-current-CLI artifact.
 
-Each individual skill's `SKILL.md` frontmatter currently carries
-`SKILL_VERSION` and `SKILL_MIN_CLI_VERSION` as top-level keys, mirrored from
-the upstream CLI's `.claude/skills/` source. These are **informational** and
-may not strictly conform to the Agent Skills spec (which expects custom keys
-under `metadata:`). The proper fix is upstream in the CLI's `sync-skill.ts`.
-Do not hand-rewrite the frontmatter here — every sync would clobber it.
+Each skill's `SKILL.md` frontmatter follows the [Agent Skills
+spec](https://agentskills.io/specification): custom version keys live under
+`metadata:` (`skill_version`, `skill_min_cli_version`) — not as top-level
+uppercase keys. The upstream CLI's bundled skill historically used top-level
+`SKILL_VERSION` / `SKILL_MIN_CLI_VERSION`; the public-repo sync script
+(`scripts/sync-from-cli.sh`) transforms the old shape into the spec-clean one
+on every sync, so the upstream order of operations doesn't matter — whether
+the CLI fix lands first or this repo's sync runs first, the public state is
+always the right shape.
+
+The values in `metadata:` are informational. The release source of truth for
+the plugin lives in `.claude-plugin/{plugin,marketplace}.json`.
 
 **Future skills** (e.g. `agent-builder`) join the same plugin bundle. Their
 content updates bump the same plugin version. If a skill ever wants

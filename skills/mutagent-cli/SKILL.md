@@ -8,8 +8,10 @@ description: |
   "create evaluation", "upload dataset", "explore prompts", "mutagent cli",
   "eval", "dataset", "guided", "how do I optimize", "improve my prompt",
   "set up tracing", "add observability".
-SKILL_VERSION: 0.1.178
-SKILL_MIN_CLI_VERSION: 0.1.163
+license: MIT
+metadata:
+  skill_version: "0.1.178"
+  skill_min_cli_version: "0.1.163"
 ---
 
 # MutagenT CLI Skill
@@ -88,10 +90,11 @@ npm install -g @mutagent/cli
 
 **Step 3 -- Version compatibility check:**
 Parse `_compat.cliVersion` from the `--version --json` output and compare against
-`SKILL_MIN_CLI_VERSION` (above in this file's frontmatter, currently `0.1.163`).
+the `skill_min_cli_version` field under `metadata:` in this file's frontmatter
+(currently `0.1.163`).
 
-- If `cliVersion >= SKILL_MIN_CLI_VERSION`: all good, proceed normally.
-- If `cliVersion < SKILL_MIN_CLI_VERSION`: emit a **PROMINENT PERSISTENT WARN** to the user:
+- If `cliVersion >= metadata.skill_min_cli_version`: all good, proceed normally.
+- If `cliVersion <  metadata.skill_min_cli_version`: emit a **PROMINENT PERSISTENT WARN** to the user:
 
   > Warning: **CLI version mismatch**: Your `mutagent` CLI is `{cliVersion}` but this Skill
   > requires `>= 0.1.163`. Some features may not work correctly.

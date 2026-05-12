@@ -115,16 +115,26 @@ for subdir in concepts workflows; do
   fi
 done
 
-# Cross-reference path rewrite (same rules used in the initial restructure).
+# Two transformations are needed to bring upstream content into spec shape:
+#   (1) cross-reference path rewrite (concepts/, workflows/ → references/)
+#   (2) frontmatter normalization (top-level SKILL_VERSION / SKILL_MIN_CLI_VERSION
+#       → metadata.skill_version / metadata.skill_min_cli_version, plus
+#       license: MIT). The upstream CLI fix tracked in monorepo #939 will
+#       eventually make (2) a no-op; until it ships to npm, this script does it.
+# Both rules are idempotent: if upstream already emits the new shape, the
+# regex patterns don't match and no edits happen.
 python3 - "$TARGET_DIR" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-targets = [root / "SKILL.md"] + sorted((root / "references").glob("*.md"))
+skill_md = root / "SKILL.md"
+content_files = sorted((root / "references").glob("*.md"))
+all_targets = [skill_md] + content_files
 
-RULES = [
+# --- (1) Cross-reference path rewrite ---
+PATH_RULES = [
     (re.compile(r"\.\./concepts/([a-z][a-z0-9-]*\.md)"),  r"./\1"),
     (re.compile(r"\.\./workflows/([a-z][a-z0-9-]*\.md)"), r"./\1"),
     (re.compile(r"\./concepts/([a-z][a-z0-9-]*\.md)"),    r"./references/\1"),
@@ -134,18 +144,82 @@ RULES = [
 ]
 
 total = 0
-for path in targets:
+for path in all_targets:
     if not path.is_file():
         continue
     text = path.read_text(encoding="utf-8")
     new = text
-    for pattern, replacement in RULES:
+    for pattern, replacement in PATH_RULES:
         new, n = pattern.subn(replacement, new)
         total += n
     if new != text:
         path.write_text(new, encoding="utf-8")
 
 print(f"    Rewrote {total} cross-reference path(s) in SKILL.md + references/")
+
+# --- (2) Frontmatter normalization ---
+# Move top-level SKILL_VERSION / SKILL_MIN_CLI_VERSION into metadata: block
+# (per agentskills.io spec). Add license: MIT if not already present.
+if skill_md.is_file():
+    text = skill_md.read_text(encoding="utf-8")
+    fm_match = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
+    if fm_match:
+        fm = fm_match.group(1)
+        rest = text[fm_match.end():]
+
+        # Capture old-style top-level keys; remove them from the frontmatter.
+        sv_match = re.search(r"^SKILL_VERSION:\s*(.+)$", fm, re.MULTILINE)
+        smcv_match = re.search(r"^SKILL_MIN_CLI_VERSION:\s*(.+)$", fm, re.MULTILINE)
+
+        if sv_match or smcv_match:
+            sv = sv_match.group(1).strip().strip('"').strip("'") if sv_match else None
+            smcv = smcv_match.group(1).strip().strip('"').strip("'") if smcv_match else None
+
+            # Strip the old top-level lines (plus any trailing blank).
+            fm = re.sub(r"^SKILL_VERSION:.*\n",        "", fm, flags=re.MULTILINE)
+            fm = re.sub(r"^SKILL_MIN_CLI_VERSION:.*\n", "", fm, flags=re.MULTILINE)
+            fm = fm.rstrip() + "\n"
+
+            # Ensure `license: MIT` is set (if not already).
+            if not re.search(r"^license:", fm, re.MULTILINE):
+                fm += "license: MIT\n"
+
+            # Build / merge metadata block.
+            md_match = re.search(r"^metadata:\n((?:[ \t].+\n)+)", fm, re.MULTILINE)
+            if md_match:
+                md_body = md_match.group(1)
+                if sv and "skill_version:" not in md_body:
+                    md_body += f'  skill_version: "{sv}"\n'
+                if smcv and "skill_min_cli_version:" not in md_body:
+                    md_body += f'  skill_min_cli_version: "{smcv}"\n'
+                fm = fm[:md_match.start(1)] + md_body + fm[md_match.end(1):]
+            else:
+                md_block = "metadata:\n"
+                if sv:
+                    md_block += f'  skill_version: "{sv}"\n'
+                if smcv:
+                    md_block += f'  skill_min_cli_version: "{smcv}"\n'
+                fm += md_block
+
+            skill_md.write_text(f"---\n{fm}---\n{rest}", encoding="utf-8")
+            print("    Normalized SKILL.md frontmatter (moved version keys → metadata)")
+
+# In-body references: 'SKILL_MIN_CLI_VERSION' (upper) → spec-shape language.
+if skill_md.is_file():
+    text = skill_md.read_text(encoding="utf-8")
+    new = re.sub(
+        r"`SKILL_MIN_CLI_VERSION`",
+        "`metadata.skill_min_cli_version`",
+        text,
+    )
+    new = re.sub(
+        r"\bSKILL_MIN_CLI_VERSION\b",
+        "metadata.skill_min_cli_version",
+        new,
+    )
+    if new != text:
+        skill_md.write_text(new, encoding="utf-8")
+        print("    Normalized in-body references to SKILL_MIN_CLI_VERSION")
 PY
 
 # Drop any vestigial upstream subdirs at root if rsync ever wrote them.
