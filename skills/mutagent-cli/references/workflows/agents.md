@@ -26,13 +26,13 @@ triggers:
 > optimizer — the platform will reject it, and scores would be meaningless for
 > a tool-calling loop.
 
-Read the **5 rules** in [SKILL.md](../SKILL.md) before executing.
+Read the **5 rules** in [SKILL.md](../../SKILL.md) before executing.
 
 ---
 
 ## When this workflow applies
 
-Load this file when the journey router in [SKILL.md](../SKILL.md) matched one of these
+Load this file when the journey router in [SKILL.md](../../SKILL.md) matched one of these
 signals in the user's code:
 
 - `AgentExecutor`, `createReactAgent`, `createToolCallingAgent`, `createStructuredChatAgent`
@@ -83,7 +83,7 @@ to partner with us on the roadmap:
    (a) → surface the URL verbatim. STOP.
    (b) → `mutagent agents list --json` ; `mutagent agents get <id> --json`
           → show results to user. STOP (no mutations available).
-   (c) → extract one sub-prompt, then route to [references/optimization.md](./optimization.md)
+   (c) → extract one sub-prompt, then route to [workflows/optimization.md](./optimization.md)
           treating the sub-prompt as a standalone Prompt.
 ```
 
@@ -103,9 +103,9 @@ treat it as a standalone Prompt.
 
 When extracting:
 1. Identify the exact string literal or template that becomes the sub-prompt.
-2. Enumerate its `{variables}` per [references/prompt-variables.md](./prompt-variables.md).
+2. Enumerate its `{variables}` per [concepts/prompt-variables.md](../concepts/prompt-variables.md).
 3. Confirm with user: "I'll optimize the planner prompt only, not the full agent. Sound right?"
-4. On confirmation → load [references/optimization.md](./optimization.md) from step 3 (prompts create).
+4. On confirmation → load [workflows/optimization.md](./optimization.md) from step 3 (prompts create).
 
 Do NOT try to extract the whole agent loop at once.
 
@@ -151,8 +151,8 @@ mutagent agents optimize <id>                          # WIP -- tracked separate
 
 ## Cross-references
 
-- [SKILL.md](../SKILL.md) → 5 rules + journey router
-- [references/exploration.md](./exploration.md) → where `agents[]` entries are first detected
-- [references/optimization.md](./optimization.md) → branch (c) destination
-- [references/prompt-variables.md](./prompt-variables.md) → `{foo}` vs `{{foo}}` for sub-prompt extraction
+- [SKILL.md](../../SKILL.md) → 5 rules + journey router
+- [workflows/exploration.md](./exploration.md) → where `agents[]` entries are first detected
+- [workflows/optimization.md](./optimization.md) → branch (c) destination
+- [concepts/prompt-variables.md](../concepts/prompt-variables.md) → `{foo}` vs `{{foo}}` for sub-prompt extraction
 - Partnership link: https://www.mutagent.io/agents-partnership

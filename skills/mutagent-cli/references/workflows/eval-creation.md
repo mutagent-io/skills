@@ -5,7 +5,7 @@ description: |
   define eval criteria for a prompt WITHOUT immediately running optimization.
   Covers guided per-field rubric collection (INPUT MVC + OUTPUT Standards),
   full-depth granular rubrics, and upload via CLI.
-  Cross-linked from references/optimization.md eval step.
+  Cross-linked from workflows/optimization.md eval step.
 triggers:
   - "create evaluation"
   - "create rubric"
@@ -30,11 +30,11 @@ triggers:
 > - "Create a rubric for this prompt"
 > - "How should we judge this prompt's outputs?"
 >
-> Use [references/optimization.md](./optimization.md) when the user wants the
+> Use [workflows/optimization.md](./optimization.md) when the user wants the
 > full loop: create prompt -> dataset -> eval -> optimize. That workflow has
 > an inline eval step that cross-links back here.
 
-Read the **5 rules** in [SKILL.md](../SKILL.md) before executing.
+Read the **5 rules** in [SKILL.md](../../SKILL.md) before executing.
 
 ---
 
@@ -49,7 +49,7 @@ Read the **5 rules** in [SKILL.md](../SKILL.md) before executing.
 
 ## Required pre-read
 
-Load [references/eval-criteria.md](./eval-criteria.md) before collecting criteria.
+Load [concepts/eval-criteria.md](../concepts/eval-criteria.md) before collecting criteria.
 It defines:
 - The Golden Rule (INPUT MVC vs OUTPUT Standards split)
 - 6-tier MVC anchor framework for INPUT-scoped criteria
@@ -82,7 +82,7 @@ rules in `_directive.instruction` -- safe to execute even without the Skill load
    -> CLI returns _directive.askUserQuestions with per-field questions
    -> follow the instruction in _directive.instruction
    -> the instruction inlines the INPUT MVC vs OUTPUT Standards framing
-      (bootstrappable -- works even if references/eval-criteria.md isn't loaded)
+      (bootstrappable -- works even if concepts/eval-criteria.md isn't loaded)
 
 5. For EACH question in _directive.askUserQuestions:
    -> use AskUserQuestion to collect the answer from the user
@@ -97,7 +97,7 @@ rules in `_directive.instruction` -- safe to execute even without the Skill load
    -> format: [{"name": "...", "description": "...", "evaluationParameter": "..."}, ...]
    -> one rubric per schema field unless user opts to merge fields
    -> use 6-tier full-depth descriptions for complex INPUT criteria
-      (see references/eval-criteria.md for examples)
+      (see concepts/eval-criteria.md for examples)
    -> use simpler 2-3-tier descriptions for OUTPUT correctness criteria
 
 7. Ask user to review the constructed criteria before upload:
@@ -112,8 +112,8 @@ rules in `_directive.instruction` -- safe to execute even without the Skill load
 
 9. Ask: "What would you like to do next?"
    -> Option A: Add more criteria (loop back to step 4)
-   -> Option B: Add a dataset -> route to references/dataset-curation.md
-   -> Option C: Start optimization -> route to references/optimization.md step 10
+   -> Option B: Add a dataset -> route to workflows/dataset-curation.md
+   -> Option C: Start optimization -> route to workflows/optimization.md step 10
    -> Option D: Done
 ```
 
@@ -159,7 +159,7 @@ multiplied by dataset items × iterations). Safe to create/edit eval criteria fr
 
 ## Common pitfalls
 
-For the canonical anti-pattern list, see [references/eval-criteria.md](./eval-criteria.md) § Anti-patterns. Workflow-specific execution mistakes:
+For the canonical anti-pattern list, see [concepts/eval-criteria.md](../concepts/eval-criteria.md) § Anti-patterns. Workflow-specific execution mistakes:
 
 - **Skipping per-field collection** -> rubric incomplete; optimizer scores against a sparse signal
 - **Auto-filling answers from context** instead of asking user -> rubric reflects the agent's assumptions, not the user's domain knowledge (Rule 3 violation)
@@ -171,11 +171,11 @@ For the canonical anti-pattern list, see [references/eval-criteria.md](./eval-cr
 
 ## Cross-references
 
-- [SKILL.md](../SKILL.md) -- 5 rules + journey router
-- [references/eval-criteria.md](./eval-criteria.md) -- Golden Rule, MVC/Output Standards, format requirements, anti-patterns
-- [references/optimization.md](./optimization.md) -- full loop; eval step cross-links here
-- [references/dataset-curation.md](./dataset-curation.md) -- parallel workflow doc (for dataset side)
-- [references/scorecard-output.md](./scorecard-output.md) -- how eval scores surface in optimization scorecard
+- [SKILL.md](../../SKILL.md) -- 5 rules + journey router
+- [concepts/eval-criteria.md](../concepts/eval-criteria.md) -- Golden Rule, MVC/Output Standards, format requirements, anti-patterns
+- [workflows/optimization.md](./optimization.md) -- full loop; eval step cross-links here
+- [workflows/dataset-curation.md](./dataset-curation.md) -- parallel workflow doc (for dataset side)
+- [concepts/scorecard-output.md](../concepts/scorecard-output.md) -- how eval scores surface in optimization scorecard
 
 ---
 

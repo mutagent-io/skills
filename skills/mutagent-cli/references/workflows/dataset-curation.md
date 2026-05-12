@@ -5,7 +5,7 @@ description: |
   or expand a dataset WITHOUT running the full optimization loop.
   Covers guided and manual dataset creation, per-field question collection,
   hard-cases-first priority, and upload via CLI.
-  Cross-linked from references/optimization.md dataset step.
+  Cross-linked from workflows/optimization.md dataset step.
 triggers:
   - "create dataset"
   - "add examples"
@@ -30,11 +30,11 @@ triggers:
 > - "Add some edge cases"
 > - "Expand the existing dataset"
 >
-> Use [references/optimization.md](./optimization.md) when the user wants the
+> Use [workflows/optimization.md](./optimization.md) when the user wants the
 > full loop: create prompt -> dataset -> eval -> optimize. That workflow has
 > an inline dataset step that cross-links back here.
 
-Read the **5 rules** in [SKILL.md](../SKILL.md) before executing.
+Read the **5 rules** in [SKILL.md](../../SKILL.md) before executing.
 
 ---
 
@@ -49,7 +49,7 @@ Read the **5 rules** in [SKILL.md](../SKILL.md) before executing.
 
 ## Required pre-read
 
-Load [references/dataset-design.md](./dataset-design.md) before collecting items.
+Load [concepts/dataset-design.md](../concepts/dataset-design.md) before collecting items.
 It defines:
 - The Golden Rule (hard cases first)
 - 4 case categories (Edge / Hard / Representative / Adversarial)
@@ -105,7 +105,7 @@ rules in `_directive.instruction` -- safe to execute even without the Skill load
 9. Ask: "What would you like to do next?"
    -> Option A: Add more items (loop back to step 4)
    -> Option B: Create an evaluation -> route to evaluation create --guided
-   -> Option C: Start optimization -> route to references/optimization.md step 10
+   -> Option C: Start optimization -> route to workflows/optimization.md step 10
    -> Option D: Done
 ```
 
@@ -161,7 +161,7 @@ Only `mutagent prompts optimize start` incurs LLM cost. Safe to run freely.
 
 ## Common pitfalls
 
-For the canonical anti-pattern list (WHY each is bad + how to fix), see [references/dataset-design.md](./dataset-design.md) § Anti-patterns. Workflow-specific execution mistakes:
+For the canonical anti-pattern list (WHY each is bad + how to fix), see [concepts/dataset-design.md](../concepts/dataset-design.md) § Anti-patterns. Workflow-specific execution mistakes:
 
 - **Uploading items with wrong field names** -> schema mismatch error from optimizer (not caught by concept-level rules)
 - **Forgetting to ask the user to review before upload** -> user can't correct mistakes (workflow step 7)
@@ -171,11 +171,11 @@ For the canonical anti-pattern list (WHY each is bad + how to fix), see [referen
 
 ## Cross-references
 
-- [SKILL.md](../SKILL.md) -- 5 rules + journey router
-- [references/dataset-design.md](./dataset-design.md) -- Golden Rule, case categories, format requirements, anti-patterns (WHY; this file is HOW)
-- [references/optimization.md](./optimization.md) -- full loop; dataset step cross-links here
-- [references/eval-creation.md](./eval-creation.md) -- parallel workflow doc (for evaluation side)
-- [references/prompt-variables.md](./prompt-variables.md) -- brace convention (for input field values)
+- [SKILL.md](../../SKILL.md) -- 5 rules + journey router
+- [concepts/dataset-design.md](../concepts/dataset-design.md) -- Golden Rule, case categories, format requirements, anti-patterns (WHY; this file is HOW)
+- [workflows/optimization.md](./optimization.md) -- full loop; dataset step cross-links here
+- [workflows/eval-creation.md](./eval-creation.md) -- parallel workflow doc (for evaluation side)
+- [concepts/prompt-variables.md](../concepts/prompt-variables.md) -- brace convention (for input field values)
 
 ---
 
@@ -190,4 +190,4 @@ mutagent prompts dataset add <prompt-id> --guided --json           # step 4: get
 mutagent prompts dataset add <prompt-id> -d '<json>' --name "<name>" --json  # step 8: upload reviewed items
 ```
 
-For the full flag glossary + cost notes, see [references/dataset-design.md](./dataset-design.md) § CLI commands.
+For the full flag glossary + cost notes, see [concepts/dataset-design.md](../concepts/dataset-design.md) § CLI commands.

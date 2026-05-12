@@ -27,13 +27,19 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Patterns that must NEVER appear in a published skill bundle.
+#
+# The `\.\./\.\./` pattern catches "escape from skill bundle" relative refs.
+# Under the references/{concepts,workflows}/ nested layout, `../../SKILL.md`
+# and `../../CHANGELOG.md` are LEGITIMATE (skill files going up two levels
+# to the skill root). The negative-lookahead allows those two while still
+# flagging anything else (e.g. `../../docs/internal-thing`).
 LEAK_PATTERNS = [
     r"mutagent-cli/src/",
     r"mutagent/src/",
     r"sync-skill\.ts",
     r"cli-design-principles",
     r"prompt-evaluations/README",
-    r"\.\./\.\./",
+    r"\.\./\.\./(?!SKILL\.md|CHANGELOG\.md)",
 ]
 LEAK_RE = re.compile("|".join(LEAK_PATTERNS))
 
@@ -118,10 +124,12 @@ RULES: list[tuple[str, str]] = [
 
 def discover_skill_files(scope: Path) -> list[Path]:
     """Return every markdown file in a skill bundle. A skill bundle is a
-    directory containing a SKILL.md. Per agentskills.io and skillsdirectory.com,
+    directory containing a SKILL.md. Per agentskills.io / skillsdirectory.com,
     a skill includes:
       - <skill_dir>/SKILL.md
-      - <skill_dir>/references/**.md   (flat list — no nested subdirs)
+      - <skill_dir>/references/**/*.md   (recursive — agentskills.io allows
+        subdirs under references/; we ship `concepts/` + `workflows/` there
+        to preserve the journey-router taxonomy without flattening)
 
     Anything else in the parent dir (README, CLAUDE.md, LICENSE, etc.) is NOT
     part of the skill bundle and is out of scope. This matters when the skill
@@ -147,7 +155,7 @@ def discover_skill_files(scope: Path) -> list[Path]:
         if skill_md.is_file() and skill_md not in seen:
             files.append(skill_md)
             seen.add(skill_md)
-        # references/ subtree (flat per spec; rglob for safety)
+        # references/ subtree — recurse to pick up concepts/, workflows/, etc.
         references = skill_dir / "references"
         if not references.is_dir():
             continue

@@ -23,7 +23,7 @@ triggers:
 > optimizer job. Each step requires user confirmation. Never auto-run the full
 > chain without presenting findings at each gate.
 
-Read the **5 rules** in [SKILL.md](../SKILL.md) before executing. All 5 rules apply here:
+Read the **5 rules** in [SKILL.md](../../SKILL.md) before executing. All 5 rules apply here:
 - `--json` on every command (Rule 1)
 - `--help` before first use of any command (Rule 2)
 - **NEVER auto-generate eval criteria** — collect from user (Rule 3)
@@ -44,8 +44,8 @@ Read the **5 rules** in [SKILL.md](../SKILL.md) before executing. All 5 rules ap
 
 | Step | Pre-read | Why |
 |---|---|---|
-| Before `prompts create` | [references/prompt-variables.md](./prompt-variables.md) | Brace convention — single `{var}` vs double `{{var}}` affects how variables are parsed |
-| Before `evaluation create --guided` | [references/eval-criteria.md](./eval-criteria.md) | INPUT MVC + OUTPUT Standards — granular rubric format |
+| Before `prompts create` | [concepts/prompt-variables.md](../concepts/prompt-variables.md) | Brace convention — single `{var}` vs double `{{var}}` affects how variables are parsed |
+| Before `evaluation create --guided` | [concepts/eval-criteria.md](../concepts/eval-criteria.md) | INPUT MVC + OUTPUT Standards — granular rubric format |
 
 ---
 
@@ -78,7 +78,7 @@ explore → prompts create → dataset add → evaluation create --guided
     mutagent prompts create --help
     → read flags before using (Rule 2)
 
- 3. Load [references/prompt-variables.md](./prompt-variables.md)
+ 3. Load [concepts/prompt-variables.md](../concepts/prompt-variables.md)
     → determine if prompt uses {single} or {{double}} braces
     → if double-brace: warn user about conversion requirement
 
@@ -94,10 +94,10 @@ explore → prompts create → dataset add → evaluation create --guided
     → show command output to user
     → record datasetId
 
- 7. Load [references/eval-criteria.md](./eval-criteria.md)
+ 7. Load [concepts/eval-criteria.md](../concepts/eval-criteria.md)
     → understand INPUT-param (MVC) vs OUTPUT-param (Standards) scope
     → for standalone eval-only work outside this optimization context, see
-      [references/eval-creation.md](./eval-creation.md) -- this step inlines a brief
+      [workflows/eval-creation.md](./eval-creation.md) -- this step inlines a brief
       version of that workflow
 
  8. mutagent prompts evaluation create <promptId> --guided --json
@@ -110,7 +110,7 @@ explore → prompts create → dataset add → evaluation create --guided
         - do NOT auto-generate any answer
     → collect at minimum: one INPUT criterion per {variable}, one OUTPUT criterion
     → for the full step-by-step including review-before-upload + decisionTree handling,
-      see [references/eval-creation.md](./eval-creation.md)
+      see [workflows/eval-creation.md](./eval-creation.md)
 
  9. mutagent prompts evaluation create <promptId> -d '<json>' --json
     → upload the criteria collected in step 8
@@ -161,7 +161,7 @@ explore → prompts create → dataset add → evaluation create --guided
 
 ## Apply / Reject rules
 
-- **Apply**: edit the source file with the optimized prompt. If the codebase used `{{double}}` braces, convert the optimized `{single}` brace output back to `{{double}}` before writing. See [references/prompt-variables.md](./prompt-variables.md) → Conversion.
+- **Apply**: edit the source file with the optimized prompt. If the codebase used `{{double}}` braces, convert the optimized `{single}` brace output back to `{{double}}` before writing. See [concepts/prompt-variables.md](../concepts/prompt-variables.md) → Conversion.
 - **Reject**: no file changes. Record the jobId in `.mutagent/mutation-context.md` for future reference.
 - **View diff**: show a unified diff of old vs new prompt text before asking again.
 
@@ -198,8 +198,8 @@ Ensure at least 2 hard/edge cases per category. Then upload:
 mutagent prompts dataset add <prompt-id> -d '<constructed-json>' --name '<name>' --json
 ```
 
-For dataset-only work (no optimization needed yet), see [references/dataset-curation.md](./dataset-curation.md)
-and [references/dataset-design.md](./dataset-design.md) for the full curation principles.
+For dataset-only work (no optimization needed yet), see [workflows/dataset-curation.md](./dataset-curation.md)
+and [concepts/dataset-design.md](../concepts/dataset-design.md) for the full curation principles.
 
 ---
 
@@ -249,20 +249,20 @@ mutagent prompts optimize results <job-id> --apply --json      # step 14b: apply
 
 **Cost note**: `optimize start` is the ONLY cost-incurring command in this workflow. All other commands are pure storage/discovery operations. The `--max-iterations` flag bounds total cost (default = 1; never raise silently).
 
-**Verbatim card protocol**: `optimize start`, `optimize status`, and `optimize results` emit `_directive.renderedCard` -- echo verbatim per [SKILL.md § MANDATORY: Verbatim Card Display Protocol](../SKILL.md).
+**Verbatim card protocol**: `optimize start`, `optimize status`, and `optimize results` emit `_directive.renderedCard` -- echo verbatim per [SKILL.md § MANDATORY: Verbatim Card Display Protocol](../../SKILL.md).
 
 For per-topic standalone HOW workflows, see:
-- [references/dataset-curation.md](./dataset-curation.md) -- standalone dataset curation
-- [references/eval-creation.md](./eval-creation.md) -- standalone evaluation rubric creation
+- [workflows/dataset-curation.md](./dataset-curation.md) -- standalone dataset curation
+- [workflows/eval-creation.md](./eval-creation.md) -- standalone evaluation rubric creation
 
 ---
 
 ## Cross-references
 
-- [SKILL.md](../SKILL.md) → 5 rules + journey router
-- [references/prompt-variables.md](./prompt-variables.md) → brace convention + conversion (critical for steps 3 and 15)
-- [references/eval-criteria.md](./eval-criteria.md) → INPUT MVC + OUTPUT Standards + granular rubric (critical for steps 7-8)
-- [references/dataset-design.md](./dataset-design.md) → dataset curation principles (Golden Rule, case categories, anti-patterns)
-- [references/dataset-curation.md](./dataset-curation.md) → standalone dataset curation (when no optimization needed yet)
-- [references/exploration.md](./exploration.md) → step 1 of this workflow
-- [references/tracing.md](./tracing.md) → parallel or follow-up path
+- [SKILL.md](../../SKILL.md) → 5 rules + journey router
+- [concepts/prompt-variables.md](../concepts/prompt-variables.md) → brace convention + conversion (critical for steps 3 and 15)
+- [concepts/eval-criteria.md](../concepts/eval-criteria.md) → INPUT MVC + OUTPUT Standards + granular rubric (critical for steps 7-8)
+- [concepts/dataset-design.md](../concepts/dataset-design.md) → dataset curation principles (Golden Rule, case categories, anti-patterns)
+- [workflows/dataset-curation.md](./dataset-curation.md) → standalone dataset curation (when no optimization needed yet)
+- [workflows/exploration.md](./exploration.md) → step 1 of this workflow
+- [workflows/tracing.md](./tracing.md) → parallel or follow-up path

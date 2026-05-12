@@ -90,36 +90,34 @@ if [[ -f "$INSTALLED_DIR/SKILL.md" ]]; then
   cp "$INSTALLED_DIR/SKILL.md" "$TARGET_DIR/SKILL.md"
 fi
 
-echo "==> Transforming upstream concepts/ + workflows/ → references/ at root"
-# Upstream CLI's bundled SKILL ships content as separate concepts/ and
-# workflows/ subdirs. The Agent Skills spec and skillsdirectory.com expect
-# a flat references/ directory. Until the CLI is updated to emit the spec-
-# clean layout (tracked in the monorepo), we transform on every sync.
+echo "==> Transforming upstream concepts/ + workflows/ → references/{concepts,workflows}/ at root"
+# Upstream CLI's bundled SKILL ships content as top-level concepts/ and
+# workflows/ subdirs (alongside SKILL.md). The Agent Skills spec wants
+# everything under a references/ parent. Move each subdir UNDER references/
+# preserving its name — `references/concepts/` and `references/workflows/`.
 #
-# Step 1: wipe the existing references/ at root so removed upstream files
-#         don't linger.
-# Step 2: copy every *.md from upstream concepts/ and workflows/ into
-#         references/ (flat).
-# Step 3: rewrite the cross-reference paths inside the copied content
-#         (concepts/X.md / workflows/X.md → references/X.md, with relative
-#         path adjustment for siblings).
+# Why nested (not flat) under references/: the internal cross-references
+# inside the moved files use relative paths like ../workflows/X.md and
+# ../concepts/Y.md. Preserving the concept/workflow split under references/
+# keeps those relative paths valid WITHOUT any in-file rewriting — the
+# moved-file content is byte-identical to upstream. Only SKILL.md (at the
+# skill root) needs its top-level path prefixes updated.
 rm -rf "$TARGET_DIR/references"
 mkdir -p "$TARGET_DIR/references"
 for subdir in concepts workflows; do
   src="$INSTALLED_DIR/$subdir"
   if [[ -d "$src" ]]; then
-    for f in "$src"/*.md; do
-      [[ -f "$f" ]] || continue
-      cp "$f" "$TARGET_DIR/references/$(basename "$f")"
-    done
+    cp -R "$src" "$TARGET_DIR/references/$subdir"
   fi
 done
 
 # Two transformations are needed to bring upstream content into spec shape:
-#   (1) cross-reference path rewrite (concepts/, workflows/ → references/)
+#   (1) SKILL.md path-prefix update (concepts/X.md → references/concepts/X.md,
+#       workflows/X.md → references/workflows/X.md) — applied only to SKILL.md
+#       at root, NOT to the moved subtree (its internal refs already work).
 #   (2) frontmatter normalization (top-level SKILL_VERSION / SKILL_MIN_CLI_VERSION
 #       → metadata.skill_version / metadata.skill_min_cli_version, plus
-#       license: MIT). The upstream CLI fix tracked in monorepo #939 will
+#       license: MIT). The upstream CLI fix tracked in monorepo #943 will
 #       eventually make (2) a no-op; until it ships to npm, this script does it.
 # Both rules are idempotent: if upstream already emits the new shape, the
 # regex patterns don't match and no edits happen.
@@ -130,32 +128,46 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 skill_md = root / "SKILL.md"
-content_files = sorted((root / "references").glob("*.md"))
-all_targets = [skill_md] + content_files
 
-# --- (1) Cross-reference path rewrite ---
-PATH_RULES = [
-    (re.compile(r"\.\./concepts/([a-z][a-z0-9-]*\.md)"),  r"./\1"),
-    (re.compile(r"\.\./workflows/([a-z][a-z0-9-]*\.md)"), r"./\1"),
-    (re.compile(r"\./concepts/([a-z][a-z0-9-]*\.md)"),    r"./references/\1"),
-    (re.compile(r"\./workflows/([a-z][a-z0-9-]*\.md)"),   r"./references/\1"),
-    (re.compile(r"\bconcepts/([a-z][a-z0-9-]*\.md)"),     r"references/\1"),
-    (re.compile(r"\bworkflows/([a-z][a-z0-9-]*\.md)"),    r"references/\1"),
+# --- (1) Path adjustments ---
+# (1a) SKILL.md: prepend `references/` to the (concepts|workflows)/X.md paths.
+# (1b) Moved files under references/{concepts,workflows}/: the only relative
+#      path that needs rewriting is `../SKILL.md` → `../../SKILL.md` because
+#      the files moved one level deeper. All OTHER relative refs (`./X.md`
+#      siblings and `../X/Y.md` cross-type) still resolve correctly under
+#      references/ because the concept/workflow split is preserved.
+SKILL_MD_RULES = [
+    (re.compile(r"\./concepts/([a-z][a-z0-9-]*\.md)"),  r"./references/concepts/\1"),
+    (re.compile(r"\./workflows/([a-z][a-z0-9-]*\.md)"), r"./references/workflows/\1"),
+    (re.compile(r"\bconcepts/([a-z][a-z0-9-]*\.md)"),   r"references/concepts/\1"),
+    (re.compile(r"\bworkflows/([a-z][a-z0-9-]*\.md)"),  r"references/workflows/\1"),
 ]
 
 total = 0
-for path in all_targets:
-    if not path.is_file():
-        continue
-    text = path.read_text(encoding="utf-8")
+if skill_md.is_file():
+    text = skill_md.read_text(encoding="utf-8")
     new = text
-    for pattern, replacement in PATH_RULES:
+    for pattern, replacement in SKILL_MD_RULES:
         new, n = pattern.subn(replacement, new)
         total += n
+    # Guard against double-prefix on re-runs.
+    new = re.sub(r"references/references/", "references/", new)
     if new != text:
-        path.write_text(new, encoding="utf-8")
+        skill_md.write_text(new, encoding="utf-8")
+        print(f"    Rewrote {total} path prefix(es) in SKILL.md")
 
-print(f"    Rewrote {total} cross-reference path(s) in SKILL.md + references/")
+# Files under references/{concepts,workflows}/: bump ../SKILL.md → ../../SKILL.md
+bumped = 0
+for ref_dir in ("concepts", "workflows"):
+    for p in (root / "references" / ref_dir).rglob("*.md"):
+        text = p.read_text(encoding="utf-8")
+        # Avoid double-bump: ../../SKILL.md should stay as-is.
+        new = re.sub(r"(?<!\.\./)\.\./SKILL\.md", "../../SKILL.md", text)
+        if new != text:
+            p.write_text(new, encoding="utf-8")
+            bumped += 1
+if bumped:
+    print(f"    Bumped ../SKILL.md → ../../SKILL.md in {bumped} reference file(s)")
 
 # --- (2) Frontmatter normalization ---
 # Move top-level SKILL_VERSION / SKILL_MIN_CLI_VERSION into metadata: block
