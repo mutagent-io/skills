@@ -118,7 +118,17 @@ RULES: list[tuple[str, str]] = [
 
 def discover_skill_files(scope: Path) -> list[Path]:
     """Return every markdown file under any skill (directory containing a
-    SKILL.md). Excludes CHANGELOG.md and known scratch/build dirs."""
+    SKILL.md). Skill bundles ONLY include:
+      - <skill_dir>/SKILL.md
+      - <skill_dir>/concepts/**.md
+      - <skill_dir>/workflows/**.md
+    Anything else in the parent dir (README, CLAUDE.md, etc.) is NOT part
+    of the skill bundle and is out of scope. This matters when the skill
+    lives at the repo root — otherwise rglob would pull in repo-level docs.
+
+    CHANGELOG.md is always excluded (per-release, not authored skill content).
+    Scratch/build dirs (.sync-tmp, .git, node_modules) are skipped.
+    """
     if scope.is_file() and scope.suffix == ".md":
         return [scope]
 
@@ -129,13 +139,27 @@ def discover_skill_files(scope: Path) -> list[Path]:
         skill_dirs.add(skill_md.parent)
 
     files: list[Path] = []
+    seen: set[Path] = set()
     for skill_dir in skill_dirs:
-        for md in skill_dir.rglob("*.md"):
-            if md.name == "CHANGELOG.md":
+        # SKILL.md itself
+        skill_md = skill_dir / "SKILL.md"
+        if skill_md.is_file() and skill_md not in seen:
+            files.append(skill_md)
+            seen.add(skill_md)
+        # concepts/ and workflows/ subtrees (recursive in case of nested files)
+        for subdir_name in ("concepts", "workflows"):
+            subdir = skill_dir / subdir_name
+            if not subdir.is_dir():
                 continue
-            if any(part in SKIP_DIR_NAMES for part in md.parts):
-                continue
-            files.append(md)
+            for md in subdir.rglob("*.md"):
+                if any(part in SKIP_DIR_NAMES for part in md.parts):
+                    continue
+                if md.name == "CHANGELOG.md":
+                    continue
+                if md in seen:
+                    continue
+                files.append(md)
+                seen.add(md)
     return files
 
 

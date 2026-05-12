@@ -52,18 +52,45 @@ jobs:
           fi
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Validate every skill against the Agent Skills spec
+      - name: Validate skill content against the Agent Skills spec
         run: |
           set -euo pipefail
           fail=0
-          for skill_md in $(find skills -mindepth 2 -maxdepth 2 -name SKILL.md); do
-            skill_dir=$(dirname "$skill_md")
-            echo "→ skills-ref validate $skill_dir"
-            if ! skills-ref validate "$skill_dir"; then
+
+          # Root-level skill content is the source of truth.
+          if [[ -f SKILL.md ]]; then
+            echo "→ skills-ref validate ./ (root skill bundle)"
+            if ! skills-ref validate .; then
               fail=1
             fi
-          done
+          fi
+
+          # Mirrors under skills/<name>/ exist for the Claude Code plugin spec.
+          # They are byte-identical to root by enforcement of the mirror-check
+          # job; we still re-validate to catch upstream-spec regressions
+          # against the Claude Code-shaped layout.
+          if [[ -d skills ]]; then
+            for skill_md in $(find skills -mindepth 2 -maxdepth 2 -name SKILL.md); do
+              skill_dir=$(dirname "$skill_md")
+              echo "→ skills-ref validate $skill_dir (mirror)"
+              if ! skills-ref validate "$skill_dir"; then
+                fail=1
+              fi
+            done
+          fi
+
           exit $fail
+
+  mirror-check:
+    name: Root ↔ skills/<name>/ mirror parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Assert mirror byte-identical to root source of truth
+        run: ./scripts/mirror-skill.sh --check
 
   marketplace-spec:
     name: Claude Code marketplace spec
