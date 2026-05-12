@@ -49,12 +49,20 @@ jobs:
           ASSET: ${{ steps.parse.outputs.asset }}
         run: |
           set -euo pipefail
-          # The single-plugin layout (source: "./") makes the whole repo the
-          # plugin source. For the release asset we ship only the
-          # installable surface: plugin/marketplace manifests + skill content.
+          # Single-plugin layout (source: "./") makes the whole repo the
+          # plugin source. The release asset ships only the installable
+          # surface: marketplace + plugin manifests, the root skill bundle
+          # (source of truth for crawlers), and the skills/<name>/ mirror
+          # (Claude Code plugin layout). Both layouts kept byte-identical by
+          # scripts/mirror-skill.sh; CI enforces parity via the mirror-check
+          # job in validate.yml.
           tar -czf "$ASSET" \
             .claude-plugin/marketplace.json \
             .claude-plugin/plugin.json \
+            SKILL.md \
+            CHANGELOG.md \
+            concepts/ \
+            workflows/ \
             skills/ \
             LICENSE \
             README.md
@@ -70,12 +78,12 @@ jobs:
           echo "# $PLUGIN v$VERSION" > "$out"
           echo "" >> "$out"
 
-          # Append the matching version section from every skill's CHANGELOG.md
-          # under skills/<name>/. If none of them carries an entry for this
-          # version, fall back to a generic line.
+          # Source of truth for changelog is the root-level CHANGELOG.md.
+          # Mirrors under skills/<name>/CHANGELOG.md are byte-identical
+          # copies (enforced by validate.yml's mirror-check). For the single-
+          # skill phase, just pull from the root CHANGELOG.
           found=0
-          for changelog in skills/*/CHANGELOG.md; do
-            [[ -f "$changelog" ]] || continue
+          if [[ -f CHANGELOG.md ]]; then
             section=$(awk -v ver="$VERSION" '
               BEGIN { in_section = 0 }
               /^## \[/ {
@@ -83,16 +91,13 @@ jobs:
                 if ($0 ~ "\\["ver"\\]") { in_section = 1; print; next }
               }
               in_section { print }
-            ' "$changelog")
+            ' CHANGELOG.md)
             if [[ -n "$section" ]]; then
-              skill_name=$(basename "$(dirname "$changelog")")
-              echo "## skills/$skill_name" >> "$out"
-              echo "" >> "$out"
               echo "$section" >> "$out"
               echo "" >> "$out"
               found=1
             fi
-          done
+          fi
 
           if [[ $found -eq 0 ]]; then
             echo "Release of $PLUGIN v$VERSION." >> "$out"

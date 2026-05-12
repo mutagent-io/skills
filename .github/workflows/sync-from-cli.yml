@@ -75,7 +75,12 @@ jobs:
       - name: Detect changes
         id: diff
         run: |
-          if git diff --quiet -- skills/mutagent-cli/ .claude-plugin/marketplace.json; then
+          # Root is source of truth; skills/<name>/ is the byte-identical
+          # mirror enforced by validate.yml. Watch all three areas.
+          if git diff --quiet -- \
+              SKILL.md CHANGELOG.md concepts/ workflows/ \
+              skills/ \
+              .claude-plugin/marketplace.json .claude-plugin/plugin.json; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true"  >> "$GITHUB_OUTPUT"
@@ -94,10 +99,11 @@ jobs:
 
             **Action items before merge:**
             - [ ] Review the diff for unexpected behavioral changes:
-                  `git diff -- skills/mutagent-cli/ .claude-plugin/marketplace.json`
-            - [ ] Update `skills/mutagent-cli/CHANGELOG.md` with a `[${{ steps.sync.outputs.cli_version }}]` entry
+                  `git diff -- SKILL.md CHANGELOG.md concepts/ workflows/ skills/ .claude-plugin/`
+            - [ ] Update `CHANGELOG.md` (root) with a `[${{ steps.sync.outputs.cli_version }}]` entry.
+                  `scripts/mirror-skill.sh` regenerates the `skills/mutagent-cli/` mirror.
 
-            On merge: `tag-on-merge.yml` pushes `mutagent-cli/v${{ steps.sync.outputs.cli_version }}`,
+            On merge: `tag-on-merge.yml` pushes `mutagent/v${{ steps.sync.outputs.cli_version }}`,
             and `release.yml` builds the GitHub Release with tarball.
           commit-message: "sync: mutagent-cli skill from CLI v${{ steps.sync.outputs.cli_version }}"
           delete-branch: true
