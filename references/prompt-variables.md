@@ -132,7 +132,7 @@ template variables.
 Use the delimiter field to:
 - Enumerate variables correctly (don't treat `{{foo}}` as two `{foo}` tokens).
 - Decide whether to convert before upload (Phase 1 above).
-- Drive the [concepts/eval-criteria.md](./eval-criteria.md) → MVC step (one criterion per variable).
+- Drive the [references/eval-criteria.md](./eval-criteria.md) → MVC step (one criterion per variable).
 
 ---
 
@@ -149,8 +149,8 @@ Use the delimiter field to:
 ## Cross-references
 
 - [SKILL.md](../SKILL.md) → 5 rules + journey router
-- [workflows/optimization.md](../workflows/optimization.md) → step 3 (delimiter drives variable enumeration) and step 15 (apply conversion)
-- [concepts/eval-criteria.md](./eval-criteria.md) → MVC (Minimum Viable Context) — uses delimiter to enumerate input params
+- [references/optimization.md](./optimization.md) → step 3 (delimiter drives variable enumeration) and step 15 (apply conversion)
+- [references/eval-criteria.md](./eval-criteria.md) → MVC (Minimum Viable Context) — uses delimiter to enumerate input params
 
 ---
 

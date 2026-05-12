@@ -61,8 +61,7 @@ jobs:
             .claude-plugin/plugin.json \
             SKILL.md \
             CHANGELOG.md \
-            concepts/ \
-            workflows/ \
+            references/ \
             skills/ \
             LICENSE \
             README.md

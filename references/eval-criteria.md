@@ -144,7 +144,7 @@ Enumerate variables using the delimiter inferred by `mutagent explore --json`:
 - `delimiter: "single"` → `{foo}` — platform canonical
 - `delimiter: "double"` → `{{foo}}` — framework template; convert before upload
 
-See [concepts/prompt-variables.md](./prompt-variables.md) for the full inference contract.
+See [references/prompt-variables.md](./prompt-variables.md) for the full inference contract.
 
 ### Example (compact inline format)
 
@@ -294,8 +294,8 @@ the output to collect rubrics in the correct order.
 ## Cross-references
 
 - [SKILL.md](../SKILL.md) → 5 rules (Rule 3: never auto-generate)
-- [workflows/optimization.md](../workflows/optimization.md) → steps 7-9 (where this concept is applied)
-- [concepts/prompt-variables.md](./prompt-variables.md) → delimiter inference (used in MVC step)
+- [references/optimization.md](./optimization.md) → steps 7-9 (where this concept is applied)
+- [references/prompt-variables.md](./prompt-variables.md) → delimiter inference (used in MVC step)
 
 ---
 
@@ -326,4 +326,4 @@ mutagent prompts evaluation delete <eval-id> --json               # delete evalu
 
 **Cost note**: eval creation/edit/delete commands incur ZERO LLM cost. Pure storage operations. LLM cost is incurred only when `mutagent prompts optimize start` runs the judge model against this evaluation.
 
-**Workflow cross-link**: for the standalone HOW (step-by-step CLI sequence), see [workflows/eval-creation.md](../workflows/eval-creation.md).
+**Workflow cross-link**: for the standalone HOW (step-by-step CLI sequence), see [references/eval-creation.md](./eval-creation.md).

@@ -84,14 +84,14 @@ Before running explore, understand what the CLI will return:
 
 2. Classify verified results:
    - prompts[]  → optimization-eligible (single-shot, output schema)
-   - agents[]   → WIP (multi-turn/tool-calling) — route to [workflows/agents.md](./agents.md)
+   - agents[]   → WIP (multi-turn/tool-calling) — route to [references/agents.md](./agents.md)
    - datasets[] → existing local data (uploadable in optimization workflow)
    - markers[]  → already-uploaded items (show dashboard links)
 
 3. Note the `delimiter` field on each prompt entry:
    - "single" → {variable} — MutagenT native, no conversion needed
    - "double" → {{variable}} — framework template, conversion required on upload
-   See [concepts/prompt-variables.md](../concepts/prompt-variables.md) for the conversion rules.
+   See [references/prompt-variables.md](./prompt-variables.md) for the conversion rules.
 
 4. Use AskUserQuestion to present findings and ask which prompts to upload:
    "Here's what I found in your codebase:
@@ -102,9 +102,9 @@ Before running explore, understand what the CLI will return:
     What would you like to do?"
 
 5. Route based on user answer:
-   - "optimize this prompt" → load [workflows/optimization.md](./optimization.md)
-   - "add tracing" → load [workflows/tracing.md](./tracing.md)
-   - "tell me about the agent" → load [workflows/agents.md](./agents.md)
+   - "optimize this prompt" → load [references/optimization.md](./optimization.md)
+   - "add tracing" → load [references/tracing.md](./tracing.md)
+   - "tell me about the agent" → load [references/agents.md](./agents.md)
    - "nothing yet" → STOP (read-only complete)
 ```
 
@@ -118,14 +118,14 @@ After step 1, show the command output to the user before proceeding to classific
 
 ## Brace convention note
 
-`mutagent explore --json` surfaces `delimiter: "single" | "double"` per discovered prompt. Use this before deciding how to enumerate variables. See [concepts/prompt-variables.md](../concepts/prompt-variables.md) for the full inference contract and conversion rules.
+`mutagent explore --json` surfaces `delimiter: "single" | "double"` per discovered prompt. Use this before deciding how to enumerate variables. See [references/prompt-variables.md](./prompt-variables.md) for the full inference contract and conversion rules.
 
 ---
 
 ## Common pitfalls
 
 - Skipping the classification step → user gets a raw JSON dump instead of a next-action recommendation
-- Treating `agents[]` entries as optimization-eligible → they are NOT; route to [workflows/agents.md](./agents.md)
+- Treating `agents[]` entries as optimization-eligible → they are NOT; route to [references/agents.md](./agents.md)
 - Auto-proceeding to writes after explore → always confirm with user first
 - Ignoring the `delimiter` field → wrong variable enumeration when uploading a double-brace prompt
 
@@ -155,7 +155,7 @@ mutagent explore --classify-only --json                # taxonomy output only (s
 ## Cross-references
 
 - [SKILL.md](../SKILL.md) → 5 rules + journey router
-- [concepts/prompt-variables.md](../concepts/prompt-variables.md) → `{foo}` vs `{{foo}}` inference + conversion
-- [workflows/optimization.md](./optimization.md) → next step after exploration (prompt path)
-- [workflows/tracing.md](./tracing.md) → next step after exploration (integration path)
-- [workflows/agents.md](./agents.md) → next step after exploration (agent path)
+- [references/prompt-variables.md](./prompt-variables.md) → `{foo}` vs `{{foo}}` inference + conversion
+- [references/optimization.md](./optimization.md) → next step after exploration (prompt path)
+- [references/tracing.md](./tracing.md) → next step after exploration (integration path)
+- [references/agents.md](./agents.md) → next step after exploration (agent path)

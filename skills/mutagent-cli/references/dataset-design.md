@@ -5,7 +5,7 @@ description: |
   The Golden Rule: hard cases > easy cases; edge cases are mandatory.
   Covers case categories (Edge / Hard / Representative / Adversarial),
   format requirements (input/expectedOutput shape), and anti-patterns.
-  Parallel structure to concepts/eval-criteria.md for cognitive parity.
+  Parallel structure to references/eval-criteria.md for cognitive parity.
 triggers:
   - "dataset design"
   - "dataset quality"
@@ -20,7 +20,7 @@ triggers:
 
 # Concept -- Dataset Design
 
-> **Parallel to** [concepts/eval-criteria.md](./eval-criteria.md) -- same section
+> **Parallel to** [references/eval-criteria.md](./eval-criteria.md) -- same section
 > structure so agents can navigate both consistently.
 >
 > **Canonical source** for dataset curation principles.
@@ -173,9 +173,9 @@ Rules:
 ## Cross-references
 
 - [SKILL.md](../SKILL.md) -- 5 rules + journey router
-- [workflows/dataset-curation.md](../workflows/dataset-curation.md) -- standalone dataset curation workflow (HOW; this file is WHY)
-- [workflows/optimization.md](../workflows/optimization.md) -- full loop that includes dataset add step
-- [concepts/eval-criteria.md](./eval-criteria.md) -- parallel concept doc for evaluation criteria
+- [references/dataset-curation.md](./dataset-curation.md) -- standalone dataset curation workflow (HOW; this file is WHY)
+- [references/optimization.md](./optimization.md) -- full loop that includes dataset add step
+- [references/eval-criteria.md](./eval-criteria.md) -- parallel concept doc for evaluation criteria
 
 ---
 

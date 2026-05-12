@@ -213,9 +213,9 @@ rl.on('line', (line) => {
 
 ## Cross-references
 
-- [concepts/eval-criteria.md](./eval-criteria.md) — how evaluation criteria are
+- [references/eval-criteria.md](./eval-criteria.md) — how evaluation criteria are
   defined; `criteria[].name` in `ScorecardData` maps to `name` in the rubric.
-- [workflows/optimization.md](../workflows/optimization.md) — full optimization
+- [references/optimization.md](./optimization.md) — full optimization
   loop; the scorecard is produced at Step 8 (watch) and Step 9 (results).
 
 ---

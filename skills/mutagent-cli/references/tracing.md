@@ -96,7 +96,7 @@ If the integration snippet requires a significant rewrite, confirm scope with th
 After step 6:
 - Update `.mutagent/mutation-context.md` with the integration marker
 - Show the dashboard link from traces output so user can verify traces in UI
-- If user wants to optimize the traced prompt → route to [workflows/optimization.md](./optimization.md)
+- If user wants to optimize the traced prompt → route to [references/optimization.md](./optimization.md)
 
 ---
 
@@ -142,6 +142,6 @@ mutagent traces get <trace-id> --json                  # inspect single trace's 
 ## Cross-references
 
 - [SKILL.md](../SKILL.md) → 5 rules + journey router
-- [workflows/exploration.md](./exploration.md) → step 1 of this workflow
-- [workflows/optimization.md](./optimization.md) → natural next step after tracing
-- [concepts/prompt-variables.md](../concepts/prompt-variables.md) → variable inference for traced prompts
+- [references/exploration.md](./exploration.md) → step 1 of this workflow
+- [references/optimization.md](./optimization.md) → natural next step after tracing
+- [references/prompt-variables.md](./prompt-variables.md) → variable inference for traced prompts

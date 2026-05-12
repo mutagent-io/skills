@@ -28,7 +28,11 @@ MIRROR_DIR="$REPO_ROOT/skills/$SKILL_NAME"
 
 # Items at the repo root that constitute the skill bundle. Anything else at
 # root (README, CLAUDE.md, LICENSE, scripts/, .github/, etc.) is NOT mirrored.
-ITEMS=(SKILL.md CHANGELOG.md concepts workflows)
+#
+# Layout follows agentskills.io / skillsdirectory.com convention: SKILL.md
+# + references/ (flat directory of markdown). The legacy
+# concepts/ + workflows/ split has been flattened into references/.
+ITEMS=(SKILL.md CHANGELOG.md references)
 
 MODE="apply"
 if [[ "${1:-}" == "--check" ]]; then
@@ -87,11 +91,13 @@ if [[ "$MODE" == "check" ]]; then
 fi
 
 # Apply mode: re-create the mirror from root content.
+# Wipe ALL existing mirror contents (not just ITEMS) so that any stale
+# directories from prior layouts (e.g. legacy concepts/, workflows/) get
+# cleaned out. This ensures the mirror is always a fresh, exact copy.
+if [[ -d "$MIRROR_DIR" ]]; then
+  find "$MIRROR_DIR" -mindepth 1 -delete
+fi
 mkdir -p "$MIRROR_DIR"
-# Wipe stale mirror contents first (in case files were renamed/removed at root).
-for item in "${ITEMS[@]}"; do
-  rm -rf "$MIRROR_DIR/$item"
-done
 
 for item in "${ITEMS[@]}"; do
   if [[ -d "$REPO_ROOT/$item" ]]; then

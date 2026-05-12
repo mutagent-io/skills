@@ -117,14 +117,15 @@ RULES: list[tuple[str, str]] = [
 
 
 def discover_skill_files(scope: Path) -> list[Path]:
-    """Return every markdown file under any skill (directory containing a
-    SKILL.md). Skill bundles ONLY include:
+    """Return every markdown file in a skill bundle. A skill bundle is a
+    directory containing a SKILL.md. Per agentskills.io and skillsdirectory.com,
+    a skill includes:
       - <skill_dir>/SKILL.md
-      - <skill_dir>/concepts/**.md
-      - <skill_dir>/workflows/**.md
-    Anything else in the parent dir (README, CLAUDE.md, etc.) is NOT part
-    of the skill bundle and is out of scope. This matters when the skill
-    lives at the repo root — otherwise rglob would pull in repo-level docs.
+      - <skill_dir>/references/**.md   (flat list — no nested subdirs)
+
+    Anything else in the parent dir (README, CLAUDE.md, LICENSE, etc.) is NOT
+    part of the skill bundle and is out of scope. This matters when the skill
+    lives at the repo root — otherwise we'd pull in repo-level docs.
 
     CHANGELOG.md is always excluded (per-release, not authored skill content).
     Scratch/build dirs (.sync-tmp, .git, node_modules) are skipped.
@@ -146,20 +147,19 @@ def discover_skill_files(scope: Path) -> list[Path]:
         if skill_md.is_file() and skill_md not in seen:
             files.append(skill_md)
             seen.add(skill_md)
-        # concepts/ and workflows/ subtrees (recursive in case of nested files)
-        for subdir_name in ("concepts", "workflows"):
-            subdir = skill_dir / subdir_name
-            if not subdir.is_dir():
+        # references/ subtree (flat per spec; rglob for safety)
+        references = skill_dir / "references"
+        if not references.is_dir():
+            continue
+        for md in references.rglob("*.md"):
+            if any(part in SKIP_DIR_NAMES for part in md.parts):
                 continue
-            for md in subdir.rglob("*.md"):
-                if any(part in SKIP_DIR_NAMES for part in md.parts):
-                    continue
-                if md.name == "CHANGELOG.md":
-                    continue
-                if md in seen:
-                    continue
-                files.append(md)
-                seen.add(md)
+            if md.name == "CHANGELOG.md":
+                continue
+            if md in seen:
+                continue
+            files.append(md)
+            seen.add(md)
     return files
 
 
