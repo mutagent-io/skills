@@ -1,0 +1,11 @@
+# CODEOWNERS — automatic review-request routing for incoming PRs.
+#
+# Format: <glob-pattern>  <owner>...
+# Docs:   https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Combined with branch protection's "Require review from Code Owners"
+# setting, every PR (including ones from forks) needs an explicit approval
+# from a listed owner before it can merge to `main`.
+
+# Catch-all — every file needs my review.
+*  @burak-cyb
