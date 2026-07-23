@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@mutagent/cli"><img src="https://img.shields.io/npm/v/@mutagent/cli?style=for-the-badge&color=cb3837&logo=npm&logoColor=white&label=CLI" alt="CLI on npm"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge" alt="License: MIT"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Marketplace-mutagent-7c3aed?style=for-the-badge" alt="Marketplace: mutagent"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Marketplace-mutagent--skills-7c3aed?style=for-the-badge" alt="Marketplace: mutagent-skills"></a>
   <a href="https://docs.claude.com/en/docs/claude-code"><img src="https://img.shields.io/badge/Claude_Code-Plugin-f97316?style=for-the-badge" alt="Claude Code Plugin"></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-Spec-2563eb?style=for-the-badge" alt="Agent Skills spec"></a>
 </p>
@@ -40,7 +40,7 @@ dataset curation, observability, and agent design.
 The repository serves **two compatible formats from a single source of truth**:
 
 - **Claude Code plugin marketplace** — `/plugin marketplace add` installs the
-  whole catalog; `/plugin install <plugin>@mutagent-io` installs one plugin.
+  whole catalog; `/plugin install <plugin>@mutagent-skills` installs one plugin.
 - **Bare [Agent Skills](https://agentskills.io)** — every skill lives at
   `skills/<name>/SKILL.md` and is consumable by any registry, crawler, or
   runtime that reads the open spec.
@@ -67,7 +67,7 @@ The marketplace ships one bundled plugin (`mutagent`) that contains every skill.
 ```bash
 # Inside Claude Code
 /plugin marketplace add mutagent-io/skills
-/plugin install mutagent@mutagent-io
+/plugin install mutagent@mutagent-skills
 ```
 
 That's it. Claude Code reads `.claude-plugin/marketplace.json` from this repo

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "mutagent-io",
+  "name": "mutagent-skills",
   "description": "Official MutagenT skills for AI coding agents — MutagenT is the platform for optimizing prompts and agents.",
   "owner": {
     "name": "Mutagent",
