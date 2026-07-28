@@ -1,16 +1,17 @@
 ---
 name: mutagent-cli
 description: |
-  MutagenT CLI - AI Prompt Optimization Platform CLI.
-  Guides coding agents through prompt upload, evaluation creation,
-  dataset curation, optimization, and framework integration.
-  Triggers: "mutagent", "optimize prompt", "upload prompt", "integrate tracing",
-  "create evaluation", "upload dataset", "explore prompts", "mutagent cli",
-  "eval", "dataset", "guided", "how do I optimize", "improve my prompt",
-  "set up tracing", "add observability".
+  MutagenT CLI - the command-line client for the MutagenT platform.
+  Guides coding agents through setup (login, init, providers, workspaces),
+  installing MutagenT packages (helix, diagnostics, evaluator), and sending
+  product feedback.
+  Triggers: "mutagent", "mutagent cli", "mutagent login", "set up mutagent",
+  "install diagnostics", "install evaluator", "install helix", "mutagent install",
+  "send feedback", "mutagent feedback", "report a bug", "usage", "quota",
+  "install skill", "install hooks".
 license: MIT
 metadata:
-  skill_version: "0.1.178"
+  skill_version: "1.2.0"
   skill_min_cli_version: "0.1.163"
 ---
 
@@ -90,11 +91,10 @@ npm install -g @mutagent/cli
 
 **Step 3 -- Version compatibility check:**
 Parse `_compat.cliVersion` from the `--version --json` output and compare against
-the `skill_min_cli_version` field under `metadata:` in this file's frontmatter
-(currently `0.1.163`).
+`metadata.skill_min_cli_version` (above in this file's frontmatter, currently `0.1.163`).
 
 - If `cliVersion >= metadata.skill_min_cli_version`: all good, proceed normally.
-- If `cliVersion <  metadata.skill_min_cli_version`: emit a **PROMINENT PERSISTENT WARN** to the user:
+- If `cliVersion < metadata.skill_min_cli_version`: emit a **PROMINENT PERSISTENT WARN** to the user:
 
   > Warning: **CLI version mismatch**: Your `mutagent` CLI is `{cliVersion}` but this Skill
   > requires `>= 0.1.163`. Some features may not work correctly.
@@ -104,6 +104,73 @@ the `skill_min_cli_version` field under `metadata:` in this file's frontmatter
   Re-emit this warn at the start of every subsequent Skill invocation until the user upgrades.
 
 **Per decision D4 (locked 2026-05-03)**: version mismatch is warn-only, never a hard block.
+
+---
+
+## Login (RUN SECOND — most commands are login-gated)
+
+Install, feedback, usage, workspaces, and providers commands all require
+an authenticated session. Establish it early:
+
+- **CI / automated**: `export MUTAGENT_API_KEY=mt_... && mutagent login --json` -- no browser, no prompts.
+- **Onboarding a user**: `mutagent login --browser --json` -- CLI prints auth URL to stdout, polls 5 min. **Surface the URL verbatim to the user.** `--non-interactive` is NOT needed when `--browser` is set.
+
+`mutagent login` is canonical. `mutagent auth login` is a back-compat alias. Both delegate to a single shared implementation; they are thin wrappers and stay that way by design.
+
+Check current state anytime with `mutagent auth status --json`.
+
+---
+
+## Command Surface (active commands)
+
+Run `mutagent <command> --help` for the authoritative, current flag list — this
+skill never inlines flags. The active surface:
+
+| Command | Purpose | Workflow |
+|---|---|---|
+| `login` / `auth` | Authenticate; check/clear session | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `init` | Interactive project setup wizard | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `config` | View/set local CLI config | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `workspaces` | List/select active workspace | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `providers` | List providers + model catalog | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `usage` | Show usage + quota | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `skills install` | Install this skill into a project | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `hooks install` | Install Claude Code telemetry hooks | [references/workflows/setup.md](./references/workflows/setup.md) |
+| `install <pkg>` | Install helix / diagnostics / evaluator | [references/workflows/install.md](./references/workflows/install.md) |
+| `feedback send` | Send product feedback | [references/workflows/feedback.md](./references/workflows/feedback.md) |
+
+---
+
+## Core Rules -- NON-NEGOTIABLE
+
+1. **`--json` on EVERY command.** No exceptions. Agents use JSON mode exclusively.
+2. **`<command> --help` BEFORE first use of any command.** The CLI is the source of truth for flags -- this skill never inlines them.
+3. **Login before login-gated commands.** install, feedback, usage, workspaces, and providers require an authenticated session. Run `mutagent login` (or set `MUTAGENT_API_KEY`) first.
+4. **Show command output to the user.** Command output appears in bash blocks the user may not see -- always present the key results in your chat reply.
+5. **Confirm before writing to the user's machine or spending.** `install`, `skills install`, and `hooks install` write files or install packages -- state what will happen and get confirmation first.
+
+---
+
+## Task Router -- route by user intent
+
+Match the user's first request. Load ONLY the matching subfile per the table. Do NOT preload the whole set.
+
+| User said / signal detected | Load subfile | Why |
+|---|---|---|
+| "log in", "authenticate", "set up mutagent", "init", "which workspace", "what models", "usage", "quota", "install the skill", "install hooks" | [references/workflows/setup.md](./references/workflows/setup.md) | Auth + project setup + discovery commands |
+| "install helix", "install diagnostics", "install evaluator", "add mutagent package" | [references/workflows/install.md](./references/workflows/install.md) | Login-gated meta-installer |
+| "send feedback", "report a bug", "file feedback", "the CLI crashed" | [references/workflows/feedback.md](./references/workflows/feedback.md) | Product feedback (+ optional transcript) |
+| Unclear / first time | run `mutagent --help --json` then reroute | Discover the surface before acting |
+
+---
+
+## Subfile Map
+
+| File | WHEN to load | WHY |
+|---|---|---|
+| [references/workflows/setup.md](./references/workflows/setup.md) | User is onboarding: login, init, config, workspaces, providers, usage, skill/hooks install | Auth + configuration + discovery |
+| [references/workflows/install.md](./references/workflows/install.md) | User wants to install a MutagenT package | `install <helix\|diagnostics\|evaluator>` meta-command |
+| [references/workflows/feedback.md](./references/workflows/feedback.md) | User wants to send feedback or report a bug | `feedback send` + `--attach-transcript` |
 
 ---
 
@@ -124,194 +191,33 @@ user's UI and they cannot read them.
   trigger is the presence of `renderedCard`, not the display tag.
 - Failure to display the card verbatim = protocol violation.
 
-This rule applies to: prompt/agent/dataset/evaluation create+update+delete,
-provider add+update+delete, and optimize start/status/results.
-
----
-
-## Agent Runtime — interactive question handling
-
-This skill emits `_directive.askUserQuestions` arrays for guided flows
-(eval-creation, dataset-curation, init). On Claude Code, use the
-**AskUserQuestion** tool to present each question to the user. On other
-coding-agent runtimes (Cursor, Aider, Continue, etc.), use the equivalent
-inquiry/prompt mechanism your runtime provides.
-
-If your runtime has no interactive-question tool, fall back to:
-1. Echo each question's `question` field verbatim into chat
-2. Wait for the user's reply before proceeding to the next question
-3. Do NOT auto-fill answers from context (Rule 3)
-
-The `_directive.askUserQuestions` schema is described in
-[`references/concepts/eval-criteria.md`](./references/concepts/eval-criteria.md) §
-"Per-field rubric collection" and follows
-[Claude Code's AskUserQuestion tool shape](https://docs.claude.com/en/docs/claude-code/sdk).
-
----
-
-## SKILL vs CLI -- responsibility split
-
-| Layer | Owner | Responsibility |
-|---|---|---|
-| **SKILL** (this file + subfiles) | here | journeys, routing, 5 rules, enforcement |
-| **CLI** | `mutagent <cmd>` | commands, flags, `--json`, `_directive.*`, `_links` |
-| Platform | api.mutagent.io | storage, optimization, eval execution, `{variable}` rendering |
-
-**Rule**: SKILL never duplicates CLI flag lists -- always `mutagent <cmd> --help` for flags.
-
----
-
-## 5 Core Rules -- NON-NEGOTIABLE
-
-1. **`--json` on EVERY command.** No exceptions. Agents use JSON mode exclusively.
-2. **`<command> --help` BEFORE first use of any command.** The CLI is the source of truth for flags -- this SKILL never inlines them.
-3. **NEVER auto-generate eval criteria -- collect from user.** Ask the user for each rubric field. See [references/concepts/eval-criteria.md](./references/concepts/eval-criteria.md) for the rubric format.
-4. **Explore-before-modify.** Run `mutagent explore --json` before any write operation. Present findings, get user confirmation. Never mutate without discovery first.
-5. **Cost transparency before `optimize start`.** Run `mutagent usage --json` and show the result to the user. Get explicit confirmation before any optimization job.
-6. **Before optimizing, run `mutagent providers list --models` to verify available models.** This calls `/providers/catalog` and shows which models are available per provider. Use the output to pick valid `--exec-model` and `--eval-model` values.
-
----
-
-## Prompt vs Agent -- pick the right loop
-
-| Signal | Use | CLI surface | Skill workflow |
-|---|---|---|---|
-| Single LLM call -> text/JSON output | Prompt Optimization | `mutagent prompts *` | [references/workflows/optimization.md](./references/workflows/optimization.md) |
-| Multi-turn / tool-calling / state graph | Agent (WIP) | `mutagent agents *` (CRUD only) | [references/workflows/agents.md](./references/workflows/agents.md) (stub) |
-
-When in doubt: run `mutagent explore --json` (it classifies discovered code under `prompts[]` vs `agents[]`).
-
----
-
-## Journey Router -- route by user intent
-
-> **Concept files = WHY/WHAT pre-reads. Workflow files = HOW step sequences.**
-> Load BOTH when intent matches both axes (e.g., "create rubric" loads
-> `references/concepts/eval-criteria.md` for the rubric design framework AND
-> `references/workflows/eval-creation.md` for the step-by-step CLI sequence). Each topic's
-> concept ↔ workflow pairing is shown in the Subfile Map below.
-
-Match the user's first request. Load ONLY the matching subfile(s) per the table. Do NOT preload the whole set.
-
-| User said / signal detected | Load subfile(s) | Why |
-|---|---|---|
-| "trace", "observe", "integrate", "add framework" | [references/workflows/tracing.md](./references/workflows/tracing.md) | Non-destructive, fastest first-value path |
-| "optimize", "improve", "tune", "upload prompt" | [references/workflows/optimization.md](./references/workflows/optimization.md) | Full create->dataset->eval->optimize loop (orchestrator) |
-| "create dataset", "add examples", "test cases", "edge cases", "hard cases", "expand dataset", "dataset items" | [references/workflows/dataset-curation.md](./references/workflows/dataset-curation.md) (HOW) + [references/concepts/dataset-design.md](./references/concepts/dataset-design.md) (WHY) | Standalone dataset curation (no optimization context needed) |
-| "create evaluation", "create rubric", "evaluate prompt", "judge", "score this prompt", "rubric design", "MVC", "Output Standards" | [references/workflows/eval-creation.md](./references/workflows/eval-creation.md) (HOW) + [references/concepts/eval-criteria.md](./references/concepts/eval-criteria.md) (WHY) | Standalone evaluation rubric creation (no optimization context needed) |
-| "explore", "scan", "find prompts", "what prompts", "discover" | [references/workflows/exploration.md](./references/workflows/exploration.md) | Read-only discovery + taxonomy |
-| `AgentExecutor`, `StateGraph`, `createReactAgent`, `tool_calls`, `@tool`, `langgraph`, `crewai`, `autogen`, `openai/agents`, multi-turn | [references/workflows/agents.md](./references/workflows/agents.md) | WIP path -- surface partnership link |
-| "how do variables work", "single vs double braces", delimiter | [references/concepts/prompt-variables.md](./references/concepts/prompt-variables.md) | Delimiter inference contract (concept-only; prompt creation lives inline in optimization.md step 4) |
-| "what makes a good eval" (concept question only, no creation intent) | [references/concepts/eval-criteria.md](./references/concepts/eval-criteria.md) | INPUT MVC + OUTPUT Standards (no workflow load) |
-| "what makes a good dataset" (concept question only, no creation intent) | [references/concepts/dataset-design.md](./references/concepts/dataset-design.md) | Dataset curation principles + case categories (no workflow load) |
-| "scorecard", "interpret results", "what does X score mean" | [references/concepts/scorecard-output.md](./references/concepts/scorecard-output.md) | Interpretation only (no workflow needed) |
-| "check models", "what models", "available models", "which models" | run `mutagent providers list --models --json` | Discovery: shows catalog per provider before model selection |
-| Unclear / first time | run `mutagent explore --json` first, then reroute | Discovery before action |
-
----
-
-## Subfile Map
-
-| File | WHEN to load | WHY | ENFORCEMENT |
-|---|---|---|---|
-| [references/workflows/tracing.md](./references/workflows/tracing.md) | User wants to add framework tracing / observability | Non-destructive append-only integration sequence | Must run explore first (Rule 4) |
-| [references/workflows/optimization.md](./references/workflows/optimization.md) | User wants to optimize or evaluate a prompt | Full loop: explore -> upload -> dataset -> eval -> optimize -> apply | Must check usage before optimize (Rule 5); must collect rubrics from user (Rule 3) |
-| [references/workflows/dataset-curation.md](./references/workflows/dataset-curation.md) | User wants to create/expand a dataset (standalone) | Focused dataset curation without full optimization context | Hard cases first; ask per-field questions |
-| [references/workflows/eval-creation.md](./references/workflows/eval-creation.md) | User wants to create/edit evaluation rubric (standalone) | Focused per-field rubric collection without full optimization context | INPUT MVC + OUTPUT Standards split; ask per-field questions; collect from user (Rule 3) |
-| [references/workflows/exploration.md](./references/workflows/exploration.md) | User wants to scan codebase, identify prompts vs agents | Read-only discovery; output taxonomy to user | Run only; no writes |
-| [references/workflows/agents.md](./references/workflows/agents.md) | Multi-turn / tool-calling code detected | WIP -- do NOT attempt optimizer, surface partnership link | Show WIP card to user verbatim |
-| [references/concepts/prompt-variables.md](./references/concepts/prompt-variables.md) | Any question about `{var}` vs `{{var}}`, delimiter inference | Brace convention + conversion rules | Load before `prompts create` in optimization workflow |
-| [references/concepts/eval-criteria.md](./references/concepts/eval-criteria.md) | Any question about rubric design, MVC, Output Standards | granular rubric format -- INPUT-param vs OUTPUT-param scope | Load before `evaluation create --guided` in optimization workflow |
-| [references/concepts/dataset-design.md](./references/concepts/dataset-design.md) | Any question about dataset quality, case categories, hard cases | Dataset design principles -- parallel structure to eval-criteria.md | Load before `dataset add --guided` |
-
----
-
-## Output handling
-
-After every CLI command:
-- **Show the command output to the user.** Command output appears in bash blocks that users may not see -- always present the key results in your chat response.
-- **For evaluation create `--guided`**: the CLI provides per-field questions in `_directive.askUserQuestions`. Ask the user each question in turn. Do not skip any field. Do not pre-fill answers.
-- **For `optimize results`**: present the before/after scorecard to the user and confirm whether to apply, view diff, or reject.
-
 ---
 
 ## Anti-patterns -- NEVER do these
 
 - Run any command without `--json`
-- Auto-generate eval criteria -- always collect from the user
-- Skip any schema field when collecting evaluation rubrics
-- Skip `mutagent explore --json` before any write operation
-- Run `optimize start` without first showing `usage --json` to the user
-- Increase `--max-iterations` above 1 without explicit user consent (each iteration = LLM spend)
-- Run a multi-turn agent through the prompt optimizer
-- Skip showing command output results to the user
 - Inline CLI flags from memory -- always read `--help` first
-
----
-
-## State Tracking
-
-- `.mutagent/mutation-context.md` -- codebase index of discovered/uploaded prompts. Update after explore, create, dataset ops.
-- `mutagent auth status --json` -- auth + workspace state.
-
----
-
-## Login (two paths)
-
-- **CI / automated**: `export MUTAGENT_API_KEY=mt_... && mutagent login --json` -- no browser, no prompts.
-- **Onboarding a user**: `mutagent login --browser --json` -- CLI prints auth URL to stdout, polls 5 min. **Surface the URL verbatim to the user.** `--non-interactive` is NOT needed when `--browser` is set.
-
-`mutagent login` is canonical. `mutagent auth login` is a back-compat alias.
+- Skip showing command output results to the user
+- Run a login-gated command before establishing a session
+- Install a package or write skill/hooks files without user confirmation
 
 ---
 
 ## Error Recovery -- Agent-Aware Bug Reporting
 
-When ANY mutagent CLI command returns a non-zero exit code or an error response,
-follow this protocol:
+When ANY mutagent CLI command returns a non-zero exit code or an error response:
 
 1. **Show the error to the user** (always) -- reproduce the exact command and output.
 2. **ASK the user** if they want to file a bug report with session context.
-3. **On user approval**, run:
+3. **On user approval**, send feedback with the session transcript attached:
    ```bash
-   echo '{"command":"<failed-cmd>","error":"<error-text>","steps":[...]}' \
-     | mutagent feedback send --category bug --context - -m "<one-line summary>"
+   mutagent feedback send "<one-line summary of the failure>" \
+     --category cli --attach-transcript --json
    ```
-   - The `--context -` flag reads structured JSON from stdin.
-   - Include: the failed command, error message, and recent steps that led to it.
-   - Use `--json` for structured confirmation: `mutagent feedback send ... --json`
+   - `--attach-transcript` (bare) auto-detects the newest coding-agent session JSONL and uploads it as context.
+   - Use `--category stage:<spec|build|evaluate|diagnose|optimize>` when the failure is about a specific lifecycle stage rather than the CLI itself.
 
-4. **After a rejected or failed optimization attempt**, ALSO OFFER this proactively:
-   > "The optimization attempt failed/was rejected. Would you like to file a bug report
-   > so the MutagenT team can investigate? I'll include the session context."
-   On approval, pipe the optimizer job ID, error, and iteration context to `--context -`.
-
-### Context payload shape
-
-The `--context` flag accepts your JSON payload (caller intent). The CLI wraps
-auto-captured fields under the reserved `_auto` key so they never overwrite
-top-level keys you supply:
-
-```json
-{
-  "command": "mutagent prompts optimize start ...",
-  "error": "ApiError: 428 Precondition Required",
-  "jobId": "opt_abc123",
-  "promptId": "prompt_xyz",
-  "steps": ["prompts create", "dataset add", "evaluation create", "optimize start"],
-  "_auto": {
-    "cliVersion": "0.2.1",
-    "platform": "darwin",
-    "nodeVersion": "v20.11.0",
-    "workspaceId": "ws_your_workspace",
-    "timestamp": "2026-04-15T10:00:00.000Z"
-  }
-}
-```
-
-`_auto` is always populated by the CLI -- do **not** set it manually. Your
-top-level keys are never overwritten; if you supply `workspaceId: "ws_agent_B"`,
-the CLI's current workspace A goes into `_auto.workspaceId`, not the top level.
+See [references/workflows/feedback.md](./references/workflows/feedback.md) for the full feedback surface.
 
 ### If `mutagent feedback send` itself fails
 
@@ -319,11 +225,11 @@ If the feedback command returns a non-zero exit code, DO NOT retry silently. Sho
 
 1. The output of `mutagent auth status` (confirms login state).
 2. The fallback: open https://app.mutagent.io and use the in-app feedback form.
-3. Offer to copy the prepared bug report to the clipboard (if running in a macOS/Linux
-   terminal with `pbcopy` / `xclip`).
 
 ---
 
 ## Extensibility
 
-Add `references/custom-<name>.md` with frontmatter `triggers: ["phrase"]` -- auto-discovered by the decision tree fallback row. No rebuild needed.
+Add `workflows/custom-<name>.md` with a markdown heading (or frontmatter
+`triggers: ["phrase"]`) -- auto-discovered by the sync pipeline. No rebuild of the
+CLI source needed; just re-run `bun run sync-skill`.

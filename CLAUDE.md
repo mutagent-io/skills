@@ -46,7 +46,7 @@ world-readable.
 ├── CLAUDE.md                — this file
 ├── README.md                — public registry index, install paths
 ├── LICENSE                  — MIT (skills only; the CLI has its own license)
-├── .github/workflows/       — validate, tag-on-merge, release, sync-from-cli
+├── .github/workflows/       — validate, tag-on-merge, release
 └── scripts/
     ├── sanitize.py          — canonical public/internal filter (idempotent)
     ├── mirror-skill.sh      — copies root content → skills/<name>/ mirror
@@ -89,7 +89,7 @@ drift between root and `skills/<name>/`.
 Currently shipping:
 
 - `skills/mutagent-cli/` (mirror of root) — guides agents through the
-  MutagenT CLI (explore → upload → dataset → eval → optimize → trace).
+  MutagenT CLI (setup → install packages → inspect usage → send feedback).
 
 Planned: `skills/agent-builder/`. **When that second skill arrives, the
 dual layout retires.** The root copy goes away, the mirror script and the
@@ -150,9 +150,10 @@ marketplace into multiple plugin entries.
 
 ## Updating an existing skill
 
-The normal path is **automatic** — `.github/workflows/sync-from-cli.yml` runs
-daily, opens a PR with the synced bundle and the bumped plugin version. You
-review, update CHANGELOG, merge.
+The automated daily CLI sync was retired after the one-time `0.1.208` refresh.
+This repository is now a public snapshot, not a continuously updated mirror.
+Do not add a scheduled synchronization workflow. Any future refresh must be
+explicitly requested, run manually, reviewed, and merged through a PR.
 
 For a manual sync:
 
@@ -166,7 +167,7 @@ rsyncs the result into `skills/mutagent-cli/`, runs `scripts/sanitize.py`,
 bumps the plugin version in both `marketplace.json` and `plugin.json`, prints
 the diff, and tells you the next git commands.
 
-After the sync (auto or manual), before merge:
+After an explicitly requested manual sync, before merge:
 
 1. Review the diff for behavioral changes.
 2. Add a new `[<version>]` entry to `skills/mutagent-cli/CHANGELOG.md`
@@ -226,7 +227,7 @@ siblings, with no hardcoded file paths).
 ./scripts/sanitize.py skills/<name>   # scope to a single skill
 ```
 
-`scripts/sync-from-cli.sh` runs it automatically after every sync, and
+`scripts/sync-from-cli.sh` runs it during an explicitly requested manual sync, and
 `.github/workflows/validate.yml` runs `--check` on every PR — a leak cannot
 land on `main`.
 
