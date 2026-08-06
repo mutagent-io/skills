@@ -35,44 +35,31 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Go (skills-ref toolchain)
-        uses: actions/setup-go@v5
+      - name: Set up Python (skills-ref toolchain)
+        uses: actions/setup-python@v5
         with:
-          go-version: 'stable'
+          python-version: '3.12'
 
       - name: Install skills-ref
-        # The skills-ref reference validator lives under agentskills/agentskills.
-        # If installation via `go install` ever changes, update the URL here.
+        # skills-ref moved from Go to a Python package under the upstream
+        # monorepo. Pin the source commit so validation is reproducible.
         run: |
           set -euo pipefail
-          if ! go install github.com/agentskills/agentskills/skills-ref/cmd/skills-ref@latest; then
-            echo "::error::Failed to install skills-ref from agentskills/agentskills." \
-                 "Update the install path or fall back to a vendored validator." >&2
-            exit 1
-          fi
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          python -m pip install \
+            "git+https://github.com/agentskills/agentskills.git@38a2ff82958afee88dadf4831509e6f7e9d8ef4e#subdirectory=skills-ref"
 
       - name: Validate skill content against the Agent Skills spec
         run: |
           set -euo pipefail
           fail=0
 
-          # Root-level skill content is the source of truth.
-          if [[ -f SKILL.md ]]; then
-            echo "→ skills-ref validate ./ (root skill bundle)"
-            if ! skills-ref validate .; then
-              fail=1
-            fi
-          fi
-
-          # Mirrors under skills/<name>/ exist for the Claude Code plugin spec.
-          # They are byte-identical to root by enforcement of the mirror-check
-          # job; we still re-validate to catch upstream-spec regressions
-          # against the Claude Code-shaped layout.
+          # Validate the spec-shaped skills/<name>/ directories. During the
+          # single-skill phase, mirror-check separately proves that the root
+          # crawler bundle is byte-identical to skills/mutagent-cli/.
           if [[ -d skills ]]; then
             for skill_md in $(find skills -mindepth 2 -maxdepth 2 -name SKILL.md); do
               skill_dir=$(dirname "$skill_md")
-              echo "→ skills-ref validate $skill_dir (mirror)"
+              echo "→ skills-ref validate $skill_dir"
               if ! skills-ref validate "$skill_dir"; then
                 fail=1
               fi
